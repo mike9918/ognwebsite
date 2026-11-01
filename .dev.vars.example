@@ -1,0 +1,21 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+# The Turnstile values below are Cloudflare's published dummy keys.
+# They always pass and siteverify reports hostname example.com, so the
+# local allowlist is example.com. Production must use a real widget.
+# Production TURNSTILE_HOSTNAMES: opengamenode.com,www.opengamenode.com
+# Do not put localhost in the production allowlist.
+
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+TURNSTILE_HOSTNAMES=example.com
+IP_HASH_SALT=replace-with-a-long-random-string
+ADMIN_TOKEN=replace-with-a-long-random-string
+
+# Leave the Discord id and secret empty to ship without Discord login.
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_INVITE_URL=
+
+# Empty uses the request origin for referral links (right for local dev).
+# Production: https://opengamenode.com
+PUBLIC_ORIGIN=
