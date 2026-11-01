@@ -12,7 +12,6 @@ export type WaitlistRow = {
   discord_username: string | null;
   run_type: RunType;
   run_detail: string | null;
-  is_13_plus: number;
   ref_code: string;
   referred_by: string | null;
   referral_count: number;
@@ -150,8 +149,8 @@ export async function createSignup(
         .prepare(
           `INSERT INTO waitlist (
              email, discord_id, discord_username, run_type, run_detail,
-             is_13_plus, ref_code, referred_by, ip_hash, country, created_at
-           ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+             ref_code, referred_by, ip_hash, country, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           input.email,

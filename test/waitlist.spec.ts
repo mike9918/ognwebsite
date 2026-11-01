@@ -17,13 +17,6 @@ function nextEmail(): string {
   return `person${sequence}@example.com`;
 }
 
-function adultBirth(): { birth_month: string; birth_year: string } {
-  return {
-    birth_month: "1",
-    birth_year: String(new Date().getUTCFullYear() - 30),
-  };
-}
-
 function installFetchMock(): void {
   globalThis.fetch = async (input, init) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
@@ -88,7 +81,6 @@ async function signup(
         ...headers,
       },
       body: formBody({
-        ...adultBirth(),
         run_type: "vanilla",
         "cf-turnstile-response": "pass",
         ...fields,
@@ -122,6 +114,9 @@ describe("pages", () => {
     const html = await page.text();
     expect(html).toContain("What will you run?");
     expect(html).toContain("Continue with Discord");
+    expect(html).toContain("Manage your server from the panel");
+    expect(html).not.toContain("birth_month");
+    expect(html).not.toContain("Start your server from Discord");
     expect(html).toContain('value="CODE12"');
     expect(html).toContain("NOT AN OFFICIAL MINECRAFT SERVICE");
     expect(html).toContain("© 2026 MH Tech Solutions");
@@ -172,46 +167,6 @@ describe("sign-up", () => {
     expect(testingKey.status).toBe(200);
   });
 
-  it("blocks under-13 answers and keeps that block on a later answer", async () => {
-    const now = new Date();
-    const child = await signup({
-      email: nextEmail(),
-      birth_month: String(now.getUTCMonth() + 1),
-      birth_year: String(now.getUTCFullYear() - 13),
-    });
-    expect(child.status).toBe(403);
-    const blocked = (await child.json()) as { message: string };
-    expect(blocked.message).toBe("Sorry, you can't join right now.");
-    expect(blocked.message).not.toContain("13");
-    const cookie = child.headers.getSetCookie().find((value) => value.startsWith("ogn_age_block="));
-    expect(cookie).toBeTruthy();
-
-    const later = await signup(
-      { email: nextEmail(), ...adultBirth() },
-      nextIp(),
-      { Cookie: "ogn_age_block=1" },
-    );
-    expect(later.status).toBe(403);
-
-    const allowedMonth = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth();
-    const allowedYear = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 14 : now.getUTCFullYear() - 13;
-    const allowed = await signup({
-      email: nextEmail(),
-      birth_month: String(allowedMonth),
-      birth_year: String(allowedYear),
-    });
-    expect(allowed.status).toBe(200);
-
-    const exported = await exports.default.fetch(
-      workerRequest("https://opengamenode.com/api/admin/export.csv", {
-        headers: { Authorization: "Bearer test-admin-token" },
-      }),
-    );
-    const csv = await exported.text();
-    expect(csv).not.toContain("birth_");
-    expect(csv.split("\r\n")[0]).not.toContain("birth");
-  });
-
   it("moves someone up by the number of friends who use their link", async () => {
     const anchorResponse = await signup({ email: nextEmail() });
     const anchor = (await anchorResponse.json()) as { refCode: string; email: string; position: number };
@@ -232,7 +187,7 @@ describe("sign-up", () => {
     const anchorRow = csv.split("\r\n").find((line) => line.includes(`,${anchor.refCode},`));
     expect(anchorRow).toBeTruthy();
     const columns = anchorRow?.split(",") ?? [];
-    expect(columns[9]).toBe("2");
+    expect(columns[8]).toBe("2");
     const friend = csv.split("\r\n").find((line) => line.includes(`,${anchor.refCode},`) && line !== anchorRow);
     expect(friend).toBeTruthy();
   });
@@ -276,7 +231,7 @@ describe("sign-up", () => {
     expect(csv).toContain('"sam, ""og"""');
     expect(csv).not.toContain(ip);
     expect(csv.split("\r\n")[0]).toBe(
-      "id,email,discord_id,discord_username,run_type,run_detail,is_13_plus,ref_code,referred_by,referral_count,ip_hash,country,created_at,invited_at,wave",
+      "id,email,discord_id,discord_username,run_type,run_detail,ref_code,referred_by,referral_count,ip_hash,country,created_at,invited_at,wave",
     );
   });
 
@@ -286,7 +241,6 @@ describe("sign-up", () => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "CF-Connecting-IP": nextIp() },
         body: formBody({
-          ...adultBirth(),
           run_type: "plugins",
           ref: "FRIEND1",
           "cf-turnstile-response": "pass",

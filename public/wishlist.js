@@ -32,15 +32,6 @@ if (form instanceof HTMLFormElement && copyNode instanceof HTMLScriptElement) {
       });
       const data = await response.json();
       if (!response.ok || !data.ok) {
-        if (data.error === "age") {
-          const message = document.createElement("section");
-          message.className = "card";
-          const heading = document.createElement("h1");
-          heading.textContent = data.message;
-          message.append(heading);
-          (form.closest("section") ?? form).replaceWith(message);
-          return;
-        }
         showError(data.message || copy.generic);
         if (window.turnstile) window.turnstile.reset();
         return;

@@ -1,5 +1,4 @@
 import { content } from "./content";
-import { isAtLeast13, parseBirth } from "./age";
 import {
   canonicalOrigin,
   cleanText,
@@ -26,8 +25,6 @@ const PENDING_COOKIE = "ogn_oauth_pending";
 const PENDING_MAX_AGE = 10 * 60;
 
 type PendingSignup = {
-  month: number;
-  year: number;
   runType: string;
   runDetail: string;
   ref: string;
@@ -96,28 +93,21 @@ export async function beginDiscord(
   request: Request,
   env: Env,
   fields: {
-    month: string;
-    year: string;
     runType: string;
     runDetail: string;
     ref: string;
     token: string;
   },
-): Promise<{ location: string; cookies: string[] } | { error: "age" | "turnstile" | "validation" }> {
+): Promise<{ location: string; cookies: string[] } | { error: "turnstile" | "validation" }> {
   if (!discordEnabled(env)) return { error: "validation" };
-  const now = new Date();
-  const birth = parseBirth(fields.month, fields.year, now);
   const runType = normalizeRunType(fields.runType);
-  if (!birth.ok || !runType) return { error: "validation" };
-  if (!isAtLeast13(birth.year, birth.month, now)) return { error: "age" };
+  if (!runType) return { error: "validation" };
   if (!(await verifyTurnstile(request, env, fields.token))) return { error: "turnstile" };
 
   const stateBytes = new Uint8Array(32);
   crypto.getRandomValues(stateBytes);
   const state = bytesToBase64Url(stateBytes);
   const pending: PendingSignup = {
-    month: birth.month,
-    year: birth.year,
     runType,
     runDetail: fields.runDetail,
     ref: normalizeRef(fields.ref) ?? "",
@@ -149,7 +139,7 @@ export async function beginDiscord(
 export async function finishDiscord(
   request: Request,
   env: Env,
-): Promise<{ entry: PublicEntry; cookies: string[] } | { error: "discord" | "discord_email" | "age" | "rate"; cookies: string[] }> {
+): Promise<{ entry: PublicEntry; cookies: string[] } | { error: "discord" | "discord_email" | "rate"; cookies: string[] }> {
   const secure = isSecure(request);
   const cleared = [clearCookie(STATE_COOKIE, secure), clearCookie(PENDING_COOKIE, secure)];
   const url = new URL(request.url);
@@ -170,12 +160,9 @@ export async function finishDiscord(
     return { error: "discord", cookies: cleared };
   }
   if (pending.state !== state) return { error: "discord", cookies: cleared };
-  const now = new Date();
-  if (!isAtLeast13(pending.year, pending.month, now)) return { error: "age", cookies: cleared };
 
   const origin = canonicalOrigin(request, env.PUBLIC_ORIGIN);
   const redirectUri = `${origin}/api/auth/discord/callback`;
-  let accessToken = "";
   try {
     const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
@@ -191,7 +178,7 @@ export async function finishDiscord(
     });
     if (!tokenResponse.ok) return { error: "discord", cookies: cleared };
     const tokenJson = (await tokenResponse.json()) as { access_token?: string };
-    accessToken = tokenJson.access_token ?? "";
+    const accessToken = tokenJson.access_token ?? "";
     if (!accessToken) return { error: "discord", cookies: cleared };
     const userResponse = await fetch("https://discord.com/api/users/@me", {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -219,7 +206,7 @@ export async function finishDiscord(
       ip: clientIp(request),
       country: clientCountry(request),
       salt: env.IP_HASH_SALT,
-      now,
+      now: new Date(),
     });
     if (!created.ok) return { error: "rate", cookies: cleared };
     console.log(
@@ -240,9 +227,8 @@ export async function finishDiscord(
   }
 }
 
-export function discordErrorMessage(error: "discord" | "discord_email" | "age" | "rate"): string {
+export function discordErrorMessage(error: "discord" | "discord_email" | "rate"): string {
   if (error === "discord_email") return content.errors.discordEmail;
-  if (error === "age") return content.ageBlocked;
   if (error === "rate") return content.errors.rate;
   return content.errors.discord;
 }

@@ -31,7 +31,7 @@ Put the printed `database_id` on the `d1_databases` entry in `wrangler.jsonc`, t
 npx wrangler d1 migrations apply ogn-waitlist --remote
 ```
 
-The table is `waitlist`. Sign-ups store an `is_13_plus` flag, never a birth date, and a salted SHA-256 of the IP, never the raw IP. Migration SQL is in `migrations/`.
+The table is `waitlist`. Sign-ups store a salted SHA-256 of the IP, never the raw IP. Servers are managed from the web panel at `panel.opengamenode.com`, not from Discord. Discord OAuth on this site is only an optional waitlist sign-in. Migration SQL is in `migrations/`.
 
 ## Secrets
 

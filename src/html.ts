@@ -3,8 +3,6 @@ import { escapeHtml, jsonScript } from "./http";
 import type { PublicEntry } from "./signup";
 
 export type FormValues = {
-  month: string;
-  year: string;
   email: string;
   discordUsername: string;
   runType: string;
@@ -18,7 +16,6 @@ export type WishlistView = {
   values: FormValues;
   error: string | null;
   success: (PublicEntry & { discordInviteUrl: string | null }) | null;
-  ageBlocked: boolean;
 };
 
 function logo(): string {
@@ -114,10 +111,6 @@ function fieldError(error: string | null): string {
   return `<p id="form-alert" class="alert" role="alert">${escapeHtml(error)}</p>`;
 }
 
-function option(value: string, label: string, selected: boolean): string {
-  return `<option value="${escapeHtml(value)}"${selected ? " selected" : ""}>${escapeHtml(label)}</option>`;
-}
-
 function successBlock(entry: PublicEntry & { discordInviteUrl: string | null }): string {
   const discord = entry.discordInviteUrl
     ? `<p><a class="button button-secondary" href="${escapeHtml(entry.discordInviteUrl)}">${escapeHtml(content.success.discord)}</a></p>`
@@ -135,7 +128,7 @@ function successBlock(entry: PublicEntry & { discordInviteUrl: string | null }):
   </section>`;
 }
 
-export function wishlistPage(view: WishlistView, now: Date): string {
+export function wishlistPage(view: WishlistView): string {
   if (view.success) {
     return layout({
       title: `${content.success.heading} ${content.name}`,
@@ -144,20 +137,6 @@ export function wishlistPage(view: WishlistView, now: Date): string {
     });
   }
 
-  if (view.ageBlocked) {
-    return layout({
-      title: content.name,
-      current: "wishlist",
-      main: `<div class="frame stack">
-        <section class="card">
-          <h1>${escapeHtml(content.ageBlocked)}</h1>
-        </section>
-      </div>`,
-    });
-  }
-
-  const years: string[] = [];
-  for (let year = now.getUTCFullYear(); year >= 1920; year -= 1) years.push(String(year));
   const described = view.error ? ` aria-describedby="form-alert"` : "";
   const turnstile = view.siteKey
     ? `<div class="cf-turnstile" data-sitekey="${escapeHtml(view.siteKey)}" data-action="signup" data-theme="dark"></div>`
@@ -195,31 +174,9 @@ export function wishlistPage(view: WishlistView, now: Date): string {
         <h2 id="form-heading">${escapeHtml(content.form.heading)}</h2>
         ${fieldError(view.error)}
         <form id="waitlist-form" method="post" action="/api/waitlist"${described}>
-          <div class="split">
-            <div>
-              <label for="birth-month">${escapeHtml(content.form.monthLabel)}</label>
-              <select id="birth-month" name="birth_month" autocomplete="bday-month" required>
-                <option value="" disabled${view.values.month === "" ? " selected" : ""}>${escapeHtml(content.form.monthPlaceholder)}</option>
-                ${content.months
-                  .map((month, index) =>
-                    option(String(index + 1), month, view.values.month === String(index + 1)),
-                  )
-                  .join("")}
-              </select>
-            </div>
-            <div>
-              <label for="birth-year">${escapeHtml(content.form.yearLabel)}</label>
-              <select id="birth-year" name="birth_year" autocomplete="bday-year" required>
-                <option value="" disabled${view.values.year === "" ? " selected" : ""}>${escapeHtml(content.form.yearPlaceholder)}</option>
-                ${years
-                  .map((year) => option(year, year, view.values.year === year))
-                  .join("")}
-              </select>
-            </div>
-          </div>
           <div>
             <label for="email">${escapeHtml(content.form.emailLabel)}</label>
-            <input id="email" name="email" type="email" autocomplete="email" maxlength="254" spellcheck="false" value="${escapeHtml(view.values.email)}">
+            <input id="email" name="email" type="email" autocomplete="email" maxlength="254" spellcheck="false" required value="${escapeHtml(view.values.email)}">
           </div>
           <div>
             <label for="discord-username">${escapeHtml(content.form.discordLabel)}</label>

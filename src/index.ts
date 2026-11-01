@@ -1,5 +1,4 @@
 import { content } from "./content";
-import { isAtLeast13, parseBirth } from "./age";
 import { exportCsv } from "./csv";
 import { beginDiscord, discordEnabled, discordErrorMessage, finishDiscord } from "./discord";
 import {
@@ -7,11 +6,8 @@ import {
   cleanText,
   clientCountry,
   clientIp,
-  isSecure,
-  readCookie,
   secretsMatch,
   securityHeaders,
-  setCookie,
   wantsJson,
 } from "./http";
 import {
@@ -32,15 +28,10 @@ import {
 } from "./signup";
 import { verifyTurnstile } from "./turnstile";
 
-const AGE_COOKIE = "ogn_age_block";
-const AGE_MAX_AGE = 12 * 60 * 60;
-
-type Failure = "validation" | "turnstile" | "age" | "rate";
+type Failure = "validation" | "turnstile" | "rate";
 
 function emptyValues(ref: string): FormValues {
   return {
-    month: "",
-    year: "",
     email: "",
     discordUsername: "",
     runType: "",
@@ -55,8 +46,6 @@ function valuesFromForm(form: FormData, refFallback: string): FormValues {
     return typeof value === "string" ? value : "";
   };
   return {
-    month: cleanText(read("birth_month"), 2),
-    year: cleanText(read("birth_year"), 4),
     email: cleanText(read("email"), 254),
     discordUsername: cleanText(read("discord_username"), 32),
     runType: cleanText(read("run_type"), 16),
@@ -65,13 +54,11 @@ function valuesFromForm(form: FormData, refFallback: string): FormValues {
   };
 }
 
-function failureMessage(failure: Failure, detail?: "email" | "run" | "birth"): string {
-  if (failure === "age") return content.ageBlocked;
+function failureMessage(failure: Failure, detail?: "email" | "run"): string {
   if (failure === "turnstile") return content.errors.turnstile;
   if (failure === "rate") return content.errors.rate;
   if (detail === "email") return content.errors.email;
   if (detail === "run") return content.errors.runType;
-  if (detail === "birth") return content.errors.birth;
   return content.errors.validation;
 }
 
@@ -130,7 +117,7 @@ async function renderWishlist(
   status: number,
   cookies: string[] = [],
 ): Promise<Response> {
-  return htmlResponse(wishlistPage(view, new Date()), status, request.method, cookies);
+  return htmlResponse(wishlistPage(view), status, request.method, cookies);
 }
 
 async function handleSignup(request: Request, env: Env): Promise<Response> {
@@ -147,36 +134,20 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
 
   const json = wantsJson(request);
   const values = valuesFromForm(form, "");
-  const secure = isSecure(request);
-  const blocked = readCookie(request, AGE_COOKIE) === "1";
   const baseView = (): WishlistView => ({
     discordEnabled: discordEnabled(env),
     siteKey: env.TURNSTILE_SITE_KEY,
     values,
     error: null,
     success: null,
-    ageBlocked: false,
   });
 
-  const fail = (failure: Failure, status: number, detail?: "email" | "run" | "birth", cookies: string[] = []) => {
+  const fail = (failure: Failure, status: number, detail?: "email" | "run", cookies: string[] = []) => {
     const message = failureMessage(failure, detail);
     if (json) return jsonResponse({ ok: false, error: failure, message }, status, cookies);
-    return renderWishlist(
-      request,
-      env,
-      { ...baseView(), error: failure === "age" ? null : message, ageBlocked: failure === "age" },
-      status,
-      cookies,
-    );
+    return renderWishlist(request, env, { ...baseView(), error: message }, status, cookies);
   };
 
-  if (blocked) {
-    return fail("age", 403);
-  }
-
-  const now = new Date();
-  const birth = parseBirth(values.month, values.year, now);
-  if (!birth.ok) return fail("validation", 400, "birth");
   const runType = normalizeRunType(values.runType);
   if (!runType) return fail("validation", 400, "run");
   const email = normalizeEmail(values.email);
@@ -185,11 +156,6 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
   const token = form.get("cf-turnstile-response");
   const turnstileToken = typeof token === "string" ? token : "";
   if (!(await verifyTurnstile(request, env, turnstileToken))) return fail("turnstile", 403);
-
-  if (!isAtLeast13(birth.year, birth.month, now)) {
-    const cookies = [setCookie(AGE_COOKIE, "1", { maxAge: AGE_MAX_AGE, secure })];
-    return fail("age", 403, undefined, cookies);
-  }
 
   if (!env.IP_HASH_SALT) {
     console.error(JSON.stringify({ event: "missing_ip_salt" }));
@@ -206,7 +172,7 @@ async function handleSignup(request: Request, env: Env): Promise<Response> {
     ip: clientIp(request),
     country: clientCountry(request),
     salt: env.IP_HASH_SALT,
-    now,
+    now: new Date(),
   });
   if (!created.ok) return fail("rate", 429);
 
@@ -240,18 +206,12 @@ async function handleDiscordStart(request: Request, env: Env): Promise<Response>
   };
   const token = form.get("cf-turnstile-response");
   const result = await beginDiscord(request, env, {
-    month: read("birth_month"),
-    year: read("birth_year"),
     runType: read("run_type"),
     runDetail: cleanText(read("run_detail"), 120),
     ref: read("ref"),
     token: typeof token === "string" ? token : "",
   });
   if ("error" in result) {
-    if (result.error === "age") {
-      const cookies = [setCookie(AGE_COOKIE, "1", { maxAge: AGE_MAX_AGE, secure: isSecure(request) })];
-      return redirect("/wishlist?error=age", 303, cookies);
-    }
     return redirect(`/wishlist?error=${result.error}`, 303);
   }
   return redirect(result.location, 302, result.cookies);
@@ -260,11 +220,7 @@ async function handleDiscordStart(request: Request, env: Env): Promise<Response>
 async function handleDiscordCallback(request: Request, env: Env): Promise<Response> {
   const result = await finishDiscord(request, env);
   if ("error" in result) {
-    const cookies = [...result.cookies];
-    if (result.error === "age") {
-      cookies.push(setCookie(AGE_COOKIE, "1", { maxAge: AGE_MAX_AGE, secure: isSecure(request) }));
-    }
-    return redirect(`/wishlist?error=${result.error}`, 303, cookies);
+    return redirect(`/wishlist?error=${result.error}`, 303, result.cookies);
   }
   return redirect(`/wishlist?welcome=${result.entry.refCode}`, 303, result.cookies);
 }
@@ -292,7 +248,6 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
 function knownError(code: string): string | null {
   if (code === "validation" || code === "turnstile") return failureMessage(code);
   if (code === "rate") return content.errors.rate;
-  if (code === "age") return content.ageBlocked;
   if (code === "discord" || code === "discord_email") return discordErrorMessage(code);
   return null;
 }
@@ -303,7 +258,6 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
   const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
   const errorCode = url.searchParams.get("error") ?? "";
   const error = knownError(errorCode);
-  const ageBlocked = readCookie(request, AGE_COOKIE) === "1" || errorCode === "age";
   if (welcome) {
     const row = await findByRef(env.DB, welcome);
     if (row) {
@@ -319,7 +273,6 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
         values: emptyValues(""),
         error: null,
         success: { ...entry, discordInviteUrl: inviteUrl(env) },
-        ageBlocked: false,
       }, 200);
     }
   }
@@ -327,10 +280,9 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
     discordEnabled: discordEnabled(env),
     siteKey: env.TURNSTILE_SITE_KEY,
     values: emptyValues(ref),
-    error: ageBlocked ? null : error,
+    error,
     success: null,
-    ageBlocked,
-  }, ageBlocked && errorCode === "age" ? 403 : 200);
+  }, 200);
 }
 
 function isAssetPath(pathname: string): boolean {

@@ -5,7 +5,6 @@ CREATE TABLE waitlist (
   discord_username TEXT,
   run_type TEXT NOT NULL CHECK (run_type IN ('vanilla', 'plugins', 'modpack')),
   run_detail TEXT,
-  is_13_plus INTEGER NOT NULL CHECK (is_13_plus = 1),
   ref_code TEXT NOT NULL UNIQUE,
   referred_by TEXT,
   referral_count INTEGER NOT NULL DEFAULT 0,
