@@ -44,6 +44,11 @@ export const content = {
         "Servers are not open yet. Invites go out in small groups so the first servers stay fast.",
     },
     {
+      question: "Why Discord to join?",
+      answer:
+        "We use Discord so each person gets one spot. We never post or send DMs on your behalf. We only read your Discord id, username, and verified email to put you on the list.",
+    },
+    {
       question: "Can I upload mods?",
       answer: "Yes. You will be able to upload your own mods and files over SFTP.",
     },
@@ -65,19 +70,18 @@ export const content = {
   privacyLink: "Privacy",
   form: {
     heading: "Join the waitlist",
-    emailLabel: "Email",
-    discordLabel: "Discord username (optional)",
+    intro:
+      "Sign in with Discord so each person gets one spot. We never post or DM on your behalf.",
     runLegend: "What will you run?",
     vanilla: "Vanilla",
     plugins: "Plugins (Paper)",
     modpack: "Modpack",
     detailLabel: "Modpack or version (optional)",
-    submit: "Join the waitlist",
     discordButton: "Continue with Discord",
   },
   success: {
     heading: "You're on the list.",
-    existing: "This email was already on the list.",
+    existing: "This Discord account was already on the list.",
     reached: "We'll reach you at {email}.",
     place: "Your place is {position}.",
     referral: "Each friend who joins moves you up the list.",
@@ -88,15 +92,22 @@ export const content = {
   },
   errors: {
     validation: "Check the form and try again.",
-    email: "Enter your email.",
     runType: "Choose what you'll run.",
     turnstile: "We couldn't confirm that submission. Please try again.",
     rate: "Too many sign-ups from this network. Please try again later.",
-    discord: "Discord sign-in didn't complete. Join with your email instead.",
-    discordEmail:
-      "Discord didn't share an email address. Join with your email instead.",
+    discord: "Discord sign-in didn't complete. Please try again.",
+    discordEmail: "Verify the email on your Discord account, then try again.",
+    discordNew: "That Discord account is too new to join right now. Try again later.",
+    closed: "The waitlist is closed right now.",
+    full: "The waitlist is full right now.",
     unavailable: "Sign-up isn't available right now.",
     generic: "Something went wrong. Please try again.",
+  },
+  admin: {
+    saved: "Settings saved.",
+    forbidden: "That Discord account is not allowed to manage the waitlist.",
+    discordFailed: "Discord sign-in didn't complete. Please try again.",
+    unavailable: "Admin sign-in isn't configured yet.",
   },
   terms: {
     title: "Terms",

@@ -11,7 +11,10 @@ TURNSTILE_HOSTNAMES=example.com
 IP_HASH_SALT=replace-with-a-long-random-string
 ADMIN_TOKEN=replace-with-a-long-random-string
 
-# Leave the Discord id and secret empty to ship without Discord login.
+# Comma-separated Discord user snowflakes allowed to open /admin.
+ADMIN_DISCORD_IDS=123456789012345678
+
+# Required for waitlist Discord sign-in and admin Discord sign-in.
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 DISCORD_INVITE_URL=

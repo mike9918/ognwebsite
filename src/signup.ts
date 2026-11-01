@@ -1,5 +1,6 @@
 import { RUN_TYPES, type RunType } from "./content";
 import { cleanText, sha256Hex } from "./http";
+import { signupBlockedReason } from "./settings";
 
 const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const RATE_LIMIT = 5;
@@ -24,7 +25,7 @@ export type WaitlistRow = {
 
 export type SignupInput = {
   email: string;
-  discordId: string | null;
+  discordId: string;
   discordUsername: string | null;
   runType: RunType;
   runDetail: string | null;
@@ -123,14 +124,18 @@ async function recentAttempts(db: D1Database, ipHash: string, now: Date): Promis
 export async function createSignup(
   db: D1Database,
   input: SignupInput,
-): Promise<{ ok: true; row: WaitlistRow; existing: boolean } | { ok: false; error: "rate" }> {
+): Promise<
+  | { ok: true; row: WaitlistRow; existing: boolean }
+  | { ok: false; error: "rate" | "closed" | "full" }
+> {
   const ipHash = await hashIp(input.ip, input.salt);
-  if (input.discordId) {
-    const byDiscord = await findByDiscord(db, input.discordId);
-    if (byDiscord) return { ok: true, row: byDiscord, existing: true };
-  }
+  const byDiscord = await findByDiscord(db, input.discordId);
+  if (byDiscord) return { ok: true, row: byDiscord, existing: true };
   const byEmail = await findByEmail(db, input.email);
   if (byEmail) return { ok: true, row: byEmail, existing: true };
+
+  const blocked = await signupBlockedReason(db);
+  if (blocked) return { ok: false, error: blocked };
 
   if ((await recentAttempts(db, ipHash, input.now)) >= RATE_LIMIT) {
     return { ok: false, error: "rate" };

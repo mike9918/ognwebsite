@@ -26,9 +26,17 @@
     {
       "binding": "DB",
       "database_name": "ogn-waitlist",
+      "database_id": "68cfe627-4fe2-4966-9c38-3dd78bca1bbd",
       "migrations_dir": "migrations"
     }
   ],
+  "routes": [
+    { "pattern": "opengamenode.com", "custom_domain": true },
+    { "pattern": "www.opengamenode.com", "custom_domain": true }
+  ],
+  "vars": {
+    "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30"
+  },
   "secrets": {
     "required": [
       "TURNSTILE_SITE_KEY",
@@ -36,6 +44,7 @@
       "TURNSTILE_HOSTNAMES",
       "IP_HASH_SALT",
       "ADMIN_TOKEN",
+      "ADMIN_DISCORD_IDS",
       "DISCORD_CLIENT_ID",
       "DISCORD_CLIENT_SECRET",
       "DISCORD_INVITE_URL",

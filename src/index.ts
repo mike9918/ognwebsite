@@ -1,14 +1,25 @@
+import {
+  adminConfigured,
+  adminDashboardPage,
+  adminLoginPage,
+  beginAdminDiscord,
+  clearAdminSession,
+  finishAdminDiscord,
+  listSubmissions,
+  parseSettingsForm,
+  readAdminSession,
+  getSettings,
+  updateSettings,
+} from "./admin";
 import { content } from "./content";
 import { exportCsv } from "./csv";
-import { beginDiscord, discordEnabled, discordErrorMessage, finishDiscord } from "./discord";
+import { beginDiscord, discordConfigured, discordErrorMessage, finishDiscord } from "./discord";
 import {
   canonicalOrigin,
   cleanText,
-  clientCountry,
-  clientIp,
+  isSecure,
   secretsMatch,
   securityHeaders,
-  wantsJson,
 } from "./http";
 import {
   homePage,
@@ -18,48 +29,15 @@ import {
   type FormValues,
   type WishlistView,
 } from "./html";
-import {
-  createSignup,
-  findByRef,
-  normalizeEmail,
-  normalizeRef,
-  normalizeRunType,
-  toPublic,
-} from "./signup";
-import { verifyTurnstile } from "./turnstile";
-
-type Failure = "validation" | "turnstile" | "rate";
+import { findByRef, normalizeRef, toPublic } from "./signup";
+import { signupBlockedReason } from "./settings";
 
 function emptyValues(ref: string): FormValues {
   return {
-    email: "",
-    discordUsername: "",
     runType: "",
     runDetail: "",
     ref,
   };
-}
-
-function valuesFromForm(form: FormData, refFallback: string): FormValues {
-  const read = (name: string) => {
-    const value = form.get(name);
-    return typeof value === "string" ? value : "";
-  };
-  return {
-    email: cleanText(read("email"), 254),
-    discordUsername: cleanText(read("discord_username"), 32),
-    runType: cleanText(read("run_type"), 16),
-    runDetail: cleanText(read("run_detail"), 120),
-    ref: normalizeRef(read("ref")) ?? normalizeRef(refFallback) ?? "",
-  };
-}
-
-function failureMessage(failure: Failure, detail?: "email" | "run"): string {
-  if (failure === "turnstile") return content.errors.turnstile;
-  if (failure === "rate") return content.errors.rate;
-  if (detail === "email") return content.errors.email;
-  if (detail === "run") return content.errors.runType;
-  return content.errors.validation;
 }
 
 function htmlResponse(body: string, status: number, method: string, cookies: string[] = []): Response {
@@ -70,16 +48,6 @@ function htmlResponse(body: string, status: number, method: string, cookies: str
   });
   for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(method === "HEAD" ? null : body, { status, headers });
-}
-
-function jsonResponse(body: unknown, status: number, cookies: string[] = []): Response {
-  const headers = new Headers({
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    ...securityHeaders(),
-  });
-  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
-  return new Response(JSON.stringify(body), { status, headers });
 }
 
 function redirect(location: string, status: number, cookies: string[] = []): Response {
@@ -112,85 +80,11 @@ function inviteUrl(env: Env): string | null {
 
 async function renderWishlist(
   request: Request,
-  env: Env,
   view: WishlistView,
   status: number,
   cookies: string[] = [],
 ): Promise<Response> {
   return htmlResponse(wishlistPage(view), status, request.method, cookies);
-}
-
-async function handleSignup(request: Request, env: Env): Promise<Response> {
-  const length = Number(request.headers.get("Content-Length") ?? "0");
-  if (Number.isFinite(length) && length > 20_000) {
-    return jsonResponse({ ok: false, error: "validation", message: content.errors.validation }, 400);
-  }
-  let form: FormData;
-  try {
-    form = await request.formData();
-  } catch {
-    return jsonResponse({ ok: false, error: "validation", message: content.errors.validation }, 400);
-  }
-
-  const json = wantsJson(request);
-  const values = valuesFromForm(form, "");
-  const baseView = (): WishlistView => ({
-    discordEnabled: discordEnabled(env),
-    siteKey: env.TURNSTILE_SITE_KEY,
-    values,
-    error: null,
-    success: null,
-  });
-
-  const fail = (failure: Failure, status: number, detail?: "email" | "run", cookies: string[] = []) => {
-    const message = failureMessage(failure, detail);
-    if (json) return jsonResponse({ ok: false, error: failure, message }, status, cookies);
-    return renderWishlist(request, env, { ...baseView(), error: message }, status, cookies);
-  };
-
-  const runType = normalizeRunType(values.runType);
-  if (!runType) return fail("validation", 400, "run");
-  const email = normalizeEmail(values.email);
-  if (!email) return fail("validation", 400, "email");
-
-  const token = form.get("cf-turnstile-response");
-  const turnstileToken = typeof token === "string" ? token : "";
-  if (!(await verifyTurnstile(request, env, turnstileToken))) return fail("turnstile", 403);
-
-  if (!env.IP_HASH_SALT) {
-    console.error(JSON.stringify({ event: "missing_ip_salt" }));
-    return fail("validation", 500);
-  }
-
-  const created = await createSignup(env.DB, {
-    email,
-    discordId: null,
-    discordUsername: values.discordUsername || null,
-    runType,
-    runDetail: values.runDetail || null,
-    ref: values.ref ? normalizeRef(values.ref) : null,
-    ip: clientIp(request),
-    country: clientCountry(request),
-    salt: env.IP_HASH_SALT,
-    now: new Date(),
-  });
-  if (!created.ok) return fail("rate", 429);
-
-  const origin = canonicalOrigin(request, env.PUBLIC_ORIGIN);
-  const entry = await toPublic(env.DB, created.row, origin, created.existing);
-  console.log(
-    JSON.stringify({
-      event: "waitlist_signup",
-      existing: created.existing,
-      country: clientCountry(request),
-      via: "email",
-    }),
-  );
-  const discordInviteUrl = inviteUrl(env);
-  if (json) {
-    return jsonResponse({ ok: true, ...entry, discordInviteUrl }, 200);
-  }
-  return redirect(`/wishlist?welcome=${entry.refCode}`, 303);
 }
 
 async function handleDiscordStart(request: Request, env: Env): Promise<Response> {
@@ -228,7 +122,9 @@ async function handleDiscordCallback(request: Request, env: Env): Promise<Respon
 async function handleExport(request: Request, env: Env): Promise<Response> {
   const header = request.headers.get("Authorization") ?? "";
   const provided = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-  if (!env.ADMIN_TOKEN || !(await secretsMatch(provided, env.ADMIN_TOKEN))) {
+  const session = await readAdminSession(request, env);
+  const bearerOk = Boolean(env.ADMIN_TOKEN && (await secretsMatch(provided, env.ADMIN_TOKEN)));
+  if (!session && !bearerOk) {
     return new Response("Unauthorized", {
       status: 401,
       headers: { "Cache-Control": "no-store", "WWW-Authenticate": "Bearer", ...securityHeaders() },
@@ -245,10 +141,19 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
   });
 }
 
-function knownError(code: string): string | null {
-  if (code === "validation" || code === "turnstile") return failureMessage(code);
-  if (code === "rate") return content.errors.rate;
-  if (code === "discord" || code === "discord_email") return discordErrorMessage(code);
+function knownWishlistError(code: string): string | null {
+  if (
+    code === "validation" ||
+    code === "turnstile" ||
+    code === "rate" ||
+    code === "discord" ||
+    code === "discord_email" ||
+    code === "discord_new" ||
+    code === "closed" ||
+    code === "full"
+  ) {
+    return discordErrorMessage(code);
+  }
   return null;
 }
 
@@ -257,7 +162,8 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
   const welcome = normalizeRef(url.searchParams.get("welcome") ?? "");
   const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
   const errorCode = url.searchParams.get("error") ?? "";
-  const error = knownError(errorCode);
+  const error = knownWishlistError(errorCode);
+  const blocked = await signupBlockedReason(env.DB);
   if (welcome) {
     const row = await findByRef(env.DB, welcome);
     if (row) {
@@ -267,8 +173,9 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
         canonicalOrigin(request, env.PUBLIC_ORIGIN),
         false,
       );
-      return renderWishlist(request, env, {
+      return renderWishlist(request, {
         discordEnabled: false,
+        accepting: true,
         siteKey: "",
         values: emptyValues(""),
         error: null,
@@ -276,13 +183,60 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
       }, 200);
     }
   }
-  return renderWishlist(request, env, {
-    discordEnabled: discordEnabled(env),
+  return renderWishlist(request, {
+    discordEnabled: discordConfigured(env),
+    accepting: blocked === null,
     siteKey: env.TURNSTILE_SITE_KEY,
     values: emptyValues(ref),
-    error,
+    error: error ?? (blocked === "closed" ? content.errors.closed : blocked === "full" ? content.errors.full : null),
     success: null,
   }, 200);
+}
+
+async function adminGet(request: Request, env: Env): Promise<Response> {
+  if (!adminConfigured(env)) {
+    return htmlResponse(adminLoginPage(content.admin.unavailable), 503, request.method);
+  }
+  const session = await readAdminSession(request, env);
+  const url = new URL(request.url);
+  const errorCode = url.searchParams.get("error") ?? "";
+  if (!session) {
+    const error =
+      errorCode === "forbidden"
+        ? content.admin.forbidden
+        : errorCode === "discord"
+          ? content.admin.discordFailed
+          : null;
+    return htmlResponse(adminLoginPage(error), 200, request.method);
+  }
+  const page = Number(url.searchParams.get("page") ?? "1");
+  const [settings, list] = await Promise.all([getSettings(env.DB), listSubmissions(env.DB, page)]);
+  const notice = url.searchParams.get("saved") === "1" ? content.admin.saved : null;
+  const error = url.searchParams.get("settings") === "invalid" ? "Check the settings and try again." : null;
+  return htmlResponse(
+    adminDashboardPage({ session, settings, list, notice, error }),
+    200,
+    request.method,
+  );
+}
+
+async function handleAdminSettings(request: Request, env: Env): Promise<Response> {
+  const session = await readAdminSession(request, env);
+  if (!session) return redirect("/admin?error=forbidden", 303);
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return redirect("/admin?settings=invalid", 303);
+  }
+  const parsed = await parseSettingsForm(form);
+  if (!parsed.ok) return redirect("/admin?settings=invalid", 303);
+  await updateSettings(env.DB, {
+    isOpen: parsed.isOpen,
+    signupCap: parsed.signupCap,
+    now: new Date(),
+  });
+  return redirect("/admin?saved=1", 303);
 }
 
 function isAssetPath(pathname: string): boolean {
@@ -314,16 +268,37 @@ export default {
         return redirect(`${url.pathname}${url.search}`, 302);
       }
 
-      if (method === "POST" && url.pathname === "/api/waitlist") return handleSignup(request, env);
       if (method === "POST" && url.pathname === "/api/auth/discord") return handleDiscordStart(request, env);
       if (method === "GET" && url.pathname === "/api/auth/discord/callback") {
         return handleDiscordCallback(request, env);
       }
+      if (method === "GET" && url.pathname === "/api/auth/admin/discord") {
+        const result = await beginAdminDiscord(request, env);
+        if ("error" in result) return redirect("/admin?error=discord", 303);
+        return redirect(result.location, 302, result.cookies);
+      }
+      if (method === "GET" && url.pathname === "/api/auth/admin/discord/callback") {
+        const result = await finishAdminDiscord(request, env);
+        if ("error" in result) {
+          return redirect(`/admin?error=${result.error}`, 303, result.cookies);
+        }
+        return redirect("/admin", 303, result.cookies);
+      }
+      if (method === "POST" && url.pathname === "/api/admin/logout") {
+        return redirect("/admin", 303, clearAdminSession(isSecure(request)));
+      }
+      if (method === "POST" && url.pathname === "/api/admin/settings") {
+        return handleAdminSettings(request, env);
+      }
       if (method === "GET" && url.pathname === "/api/admin/export.csv") return handleExport(request, env);
+      if (method === "POST" && url.pathname === "/api/waitlist") {
+        return new Response("Gone", { status: 410, headers: securityHeaders() });
+      }
 
       if (method === "GET" || method === "HEAD") {
         if (url.pathname === "/") return htmlResponse(homePage(), 200, method);
         if (url.pathname === "/wishlist") return wishlistGet(request, env);
+        if (url.pathname === "/admin") return adminGet(request, env);
         if (url.pathname === "/terms") return htmlResponse(textPage(content.terms.title, content.terms.body), 200, method);
         if (url.pathname === "/privacy") {
           return htmlResponse(textPage(content.privacy.title, content.privacy.body), 200, method);

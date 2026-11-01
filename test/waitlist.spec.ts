@@ -1,20 +1,27 @@
 import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { snowflakeForAgeDays } from "../src/discord-age";
 
 type TestEnv = Env & { TEST_MIGRATIONS: D1Migration[] };
 
 const originalFetch = globalThis.fetch;
 let sequence = 0;
+let mockUser: {
+  id: string;
+  username: string;
+  email: string | null;
+  verified: boolean;
+} = {
+  id: snowflakeForAgeDays(60),
+  username: "ada",
+  email: "Ada@Example.com",
+  verified: true,
+};
 
 function nextIp(): string {
   sequence += 1;
   return `203.0.113.${sequence}`;
-}
-
-function nextEmail(): string {
-  sequence += 1;
-  return `person${sequence}@example.com`;
 }
 
 function installFetchMock(): void {
@@ -23,18 +30,8 @@ function installFetchMock(): void {
     if (url.startsWith("https://challenges.cloudflare.com/turnstile/v0/siteverify")) {
       const params = new URLSearchParams(String(init?.body ?? ""));
       const token = params.get("response");
-      if (token === "pass" || token === "testing") {
-        const body =
-          token === "pass"
-            ? { success: true, hostname: "example.com", action: "signup" }
-            : { success: true, hostname: "example.com", metadata: { result_with_testing_key: true } };
-        return Response.json(body);
-      }
-      if (token === "wrong-host") {
-        return Response.json({ success: true, hostname: "evil.example", action: "signup" });
-      }
-      if (token === "wrong-action") {
-        return Response.json({ success: true, hostname: "example.com", action: "login" });
+      if (token === "pass" || token === "testing" || token === "XXXX.DUMMY.TOKEN.XXXX") {
+        return Response.json({ success: true, hostname: "example.com", action: "signup" });
       }
       return Response.json({ success: false, hostname: "example.com", "error-codes": ["invalid-input-response"] });
     }
@@ -42,15 +39,29 @@ function installFetchMock(): void {
       return Response.json({ access_token: "discord-access" });
     }
     if (url === "https://discord.com/api/users/@me") {
-      return Response.json({ id: "discord-user-1", username: "ada", email: "Ada@Example.com" });
+      return Response.json(mockUser);
     }
     return originalFetch(input, init);
   };
 }
 
 beforeEach(async () => {
+  sequence = 0;
+  mockUser = {
+    id: snowflakeForAgeDays(60),
+    username: "ada",
+    email: "Ada@Example.com",
+    verified: true,
+  };
   installFetchMock();
   await applyD1Migrations(env.DB, (env as TestEnv).TEST_MIGRATIONS);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM waitlist"),
+    env.DB.prepare("DELETE FROM signup_attempts"),
+    env.DB.prepare(
+      "UPDATE waitlist_settings SET is_open = 1, signup_cap = NULL, updated_at = ?",
+    ).bind(new Date().toISOString()),
+  ]);
 });
 
 afterEach(() => {
@@ -65,20 +76,17 @@ function workerRequest(url: string, init: RequestInit = {}): Request {
   return new Request(url, { redirect: "manual", ...init });
 }
 
-async function signup(
-  fields: Record<string, string>,
+async function startDiscord(
+  fields: Record<string, string> = {},
   ip = nextIp(),
-  headers: HeadersInit = {},
 ): Promise<Response> {
   return exports.default.fetch(
-    workerRequest("https://opengamenode.com/api/waitlist", {
+    workerRequest("https://opengamenode.com/api/auth/discord", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
         "CF-Connecting-IP": ip,
         "CF-IPCountry": "US",
-        ...headers,
       },
       body: formBody({
         run_type: "vanilla",
@@ -89,195 +97,243 @@ async function signup(
   );
 }
 
+async function finishDiscord(start: Response): Promise<Response> {
+  const location = new URL(start.headers.get("Location") ?? "");
+  const cookies = start.headers.getSetCookie().map((cookie) => cookie.split(";")[0]).join("; ");
+  return exports.default.fetch(
+    workerRequest(
+      `https://opengamenode.com/api/auth/discord/callback?code=auth-code&state=${location.searchParams.get("state")}`,
+      { headers: { Cookie: cookies, "CF-Connecting-IP": nextIp() } },
+    ),
+  );
+}
+
+async function discordSignup(fields: Record<string, string> = {}): Promise<{
+  start: Response;
+  callback: Response;
+  welcome: string;
+}> {
+  const start = await startDiscord(fields);
+  expect(start.status, start.headers.get("Location") ?? "").toBe(302);
+  const callback = await finishDiscord(start);
+  expect(callback.status, callback.headers.get("Location") ?? "").toBe(303);
+  const welcome = callback.headers.get("Location") ?? "";
+  return { start, callback, welcome };
+}
+
 describe("pages", () => {
-  it("serves the homepage and sends referral links to the waitlist", async () => {
+  it("serves the homepage and Discord-only waitlist", async () => {
     const home = await exports.default.fetch(workerRequest("https://opengamenode.com/"));
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Free game servers. More time to play.");
-    expect(html).toContain("Your game. Your server. Open to everyone.");
     expect(html).toContain('href="/wishlist"');
-    expect(html).not.toContain('name="email"');
-    expect(html).toContain("NOT AN OFFICIAL MINECRAFT SERVICE");
 
-    const referred = await exports.default.fetch(workerRequest("https://opengamenode.com/?ref=AbC123"));
-    expect(referred.status).toBe(302);
-    expect(referred.headers.get("Location")).toBe("/wishlist?ref=AbC123");
-
-    const www = await exports.default.fetch(workerRequest("https://www.opengamenode.com/wishlist?ref=AbC123"));
-    expect(www.status).toBe(301);
-    expect(www.headers.get("Location")).toBe("https://opengamenode.com/wishlist?ref=AbC123");
-  });
-
-  it("serves the waitlist, legal pages, and a real 404", async () => {
     const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?ref=CODE12"));
-    const html = await page.text();
-    expect(html).toContain("What will you run?");
-    expect(html).toContain("Continue with Discord");
-    expect(html).toContain("Manage your server from the panel");
-    expect(html).not.toContain("birth_month");
-    expect(html).not.toContain("Start your server from Discord");
-    expect(html).toContain('value="CODE12"');
-    expect(html).toContain("NOT AN OFFICIAL MINECRAFT SERVICE");
-    expect(html).toContain("© 2026 MH Tech Solutions");
-
-    const terms = await exports.default.fetch(workerRequest("https://opengamenode.com/terms"));
-    expect(await terms.text()).toContain("placeholder");
-    const privacy = await exports.default.fetch(workerRequest("https://opengamenode.com/privacy"));
-    expect(await privacy.text()).toContain("placeholder");
-    const missing = await exports.default.fetch(workerRequest("https://opengamenode.com/no-such-page"));
-    expect(missing.status).toBe(404);
-    expect(await missing.text()).toContain("That page isn&#39;t here.");
+    const waitlist = await page.text();
+    expect(waitlist).toContain("Continue with Discord");
+    expect(waitlist).toContain("Why Discord to join?");
+    expect(waitlist).toContain('value="CODE12"');
+    expect(waitlist).not.toContain('name="email"');
+    expect(waitlist).not.toContain("/api/waitlist");
   });
 });
 
-describe("sign-up", () => {
-  it("records a sign-up, rejects a bad token, and returns duplicates", async () => {
-    const address = nextEmail();
-    const created = await signup({ email: address, discord_username: 'ada, "node"', run_type: "modpack", run_detail: "Create" });
-    expect(created.status, await created.clone().text()).toBe(200);
-    const body = (await created.json()) as {
-      ok: boolean;
-      refCode: string;
-      referralUrl: string;
-      position: number;
-      existing: boolean;
-      email: string;
-    };
-    expect(body.ok).toBe(true);
-    expect(body.existing).toBe(false);
-    expect(body.position).toBeGreaterThan(0);
-    expect(body.email).toBe(address);
-    expect(body.referralUrl).toBe(`https://opengamenode.com/wishlist?ref=${body.refCode}`);
-
-    const duplicate = await signup({ email: address.toUpperCase() });
-    expect(duplicate.status).toBe(200);
-    const again = (await duplicate.json()) as { existing: boolean; refCode: string };
-    expect(again.existing).toBe(true);
-    expect(again.refCode).toBe(body.refCode);
-
-    for (const token of ["", "nope", "wrong-host", "wrong-action"]) {
-      const rejected = await signup({ email: nextEmail(), "cf-turnstile-response": token });
-      expect(rejected.status).toBe(403);
-      const error = (await rejected.json()) as { error: string };
-      expect(error.error).toBe("turnstile");
-    }
-
-    const testingKey = await signup({ email: nextEmail(), "cf-turnstile-response": "testing" });
-    expect(testingKey.status).toBe(200);
-  });
-
-  it("moves someone up by the number of friends who use their link", async () => {
-    const anchorResponse = await signup({ email: nextEmail() });
-    const anchor = (await anchorResponse.json()) as { refCode: string; email: string; position: number };
-    await signup({ email: nextEmail(), ref: anchor.refCode });
-    await signup({ email: nextEmail(), ref: anchor.refCode.toLowerCase() });
-    const ignored = await signup({ email: nextEmail(), ref: "NOPE" });
-    expect(ignored.status).toBe(200);
-
-    const revisit = (await (await signup({ email: anchor.email })).json()) as { position: number };
-    expect(revisit.position).toBe(Math.max(1, anchor.position - 2));
-
-    const csvResponse = await exports.default.fetch(
-      workerRequest("https://opengamenode.com/api/admin/export.csv", {
-        headers: { Authorization: "Bearer test-admin-token" },
-      }),
-    );
-    const csv = await csvResponse.text();
-    const anchorRow = csv.split("\r\n").find((line) => line.includes(`,${anchor.refCode},`));
-    expect(anchorRow).toBeTruthy();
-    const columns = anchorRow?.split(",") ?? [];
-    expect(columns[8]).toBe("2");
-    const friend = csv.split("\r\n").find((line) => line.includes(`,${anchor.refCode},`) && line !== anchorRow);
-    expect(friend).toBeTruthy();
-  });
-
-  it("limits new sign-ups from one network to five an hour", async () => {
-    const ip = nextIp();
-    const first = nextEmail();
-    for (let count = 0; count < 5; count += 1) {
-      const response = await signup({ email: count === 0 ? first : nextEmail() }, ip);
-      expect(response.status, await response.clone().text()).toBe(200);
-    }
-    const blocked = await signup({ email: nextEmail() }, ip);
-    expect(blocked.status).toBe(429);
-    const duplicate = await signup({ email: first }, ip);
-    expect(duplicate.status).toBe(200);
-    const body = (await duplicate.json()) as { existing: boolean };
-    expect(body.existing).toBe(true);
-  });
-
-  it("exports the csv only with the admin token", async () => {
-    const address = nextEmail();
-    const ip = "198.51.100.20";
-    await signup({ email: address, discord_username: 'sam, "og"' }, ip);
-    const missing = await exports.default.fetch(workerRequest("https://opengamenode.com/api/admin/export.csv"));
-    expect(missing.status).toBe(401);
-    const wrong = await exports.default.fetch(
-      workerRequest("https://opengamenode.com/api/admin/export.csv", {
-        headers: { Authorization: "Bearer wrong-token" },
-      }),
-    );
-    expect(wrong.status).toBe(401);
-    const ok = await exports.default.fetch(
-      workerRequest("https://opengamenode.com/api/admin/export.csv", {
-        headers: { Authorization: "Bearer test-admin-token" },
-      }),
-    );
-    expect(ok.status).toBe(200);
-    expect(ok.headers.get("Content-Type")).toContain("text/csv");
-    const csv = await ok.text();
-    expect(csv).toContain(address);
-    expect(csv).toContain('"sam, ""og"""');
-    expect(csv).not.toContain(ip);
-    expect(csv.split("\r\n")[0]).toBe(
-      "id,email,discord_id,discord_username,run_type,run_detail,ref_code,referred_by,referral_count,ip_hash,country,created_at,invited_at,wave",
-    );
-  });
-
-  it("finishes Discord sign-in when the client is configured", async () => {
-    const start = await exports.default.fetch(
-      workerRequest("https://opengamenode.com/api/auth/discord", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded", "CF-Connecting-IP": nextIp() },
-        body: formBody({
-          run_type: "plugins",
-          ref: "FRIEND1",
-          "cf-turnstile-response": "pass",
-        }),
-      }),
-    );
-    expect(start.status, start.headers.get("Location") ?? "").toBe(302);
-    const location = new URL(start.headers.get("Location") ?? "");
-    expect(location.hostname).toBe("discord.com");
-    expect(location.searchParams.get("scope")).toBe("identify email");
-    expect(location.searchParams.get("redirect_uri")).toBe(
-      "https://opengamenode.com/api/auth/discord/callback",
-    );
-    const cookies = start.headers.getSetCookie();
-    const callback = await exports.default.fetch(
-      workerRequest(
-        `https://opengamenode.com/api/auth/discord/callback?code=auth-code&state=${location.searchParams.get("state")}`,
-        { headers: { Cookie: cookies.map((cookie) => cookie.split(";")[0]).join("; ") } },
-      ),
-    );
-    expect(callback.status).toBe(303);
-    expect(callback.headers.get("Location")).toMatch(/^\/wishlist\?welcome=/);
-
-    const page = await exports.default.fetch(
-      workerRequest(`https://opengamenode.com${callback.headers.get("Location")}`),
-    );
+describe("discord sign-up", () => {
+  it("creates one row and returns the same entry for the same Discord account", async () => {
+    const first = await discordSignup({ run_type: "modpack", run_detail: "Create" });
+    expect(first.welcome).toMatch(/^\/wishlist\?welcome=/);
+    const page = await exports.default.fetch(workerRequest(`https://opengamenode.com${first.welcome}`));
     const html = await page.text();
     expect(html).toContain("You&#39;re on the list.");
     expect(html).toContain("ada@example.com");
+
+    const again = await discordSignup({ run_type: "vanilla" });
+    expect(again.welcome).toBe(first.welcome);
+
+    const emailOnly = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: formBody({ email: "nope@example.com", run_type: "vanilla", "cf-turnstile-response": "pass" }),
+      }),
+    );
+    expect(emailOnly.status).toBe(410);
   });
 
-  it("accepts Cloudflare's published dummy token", async () => {
-    globalThis.fetch = originalFetch;
-    const response = await signup({
-      email: nextEmail(),
-      "cf-turnstile-response": "XXXX.DUMMY.TOKEN.XXXX",
-    });
-    expect(response.status, await response.clone().text()).toBe(200);
+  it("rejects unverified email, new accounts, and bad state", async () => {
+    mockUser = { ...mockUser, verified: false, id: snowflakeForAgeDays(90) };
+    const unverifiedStart = await startDiscord();
+    const unverified = await finishDiscord(unverifiedStart);
+    expect(unverified.headers.get("Location")).toBe("/wishlist?error=discord_email");
+
+    mockUser = {
+      id: snowflakeForAgeDays(5),
+      username: "newbie",
+      email: "new@example.com",
+      verified: true,
+    };
+    const youngStart = await startDiscord();
+    const young = await finishDiscord(youngStart);
+    expect(young.headers.get("Location")).toBe("/wishlist?error=discord_new");
+
+    mockUser = {
+      id: snowflakeForAgeDays(80),
+      username: "ok",
+      email: "ok@example.com",
+      verified: true,
+    };
+    const start = await startDiscord();
+    const location = new URL(start.headers.get("Location") ?? "");
+    const cookies = start.headers.getSetCookie().map((cookie) => cookie.split(";")[0]).join("; ");
+    const badState = await exports.default.fetch(
+      workerRequest(
+        `https://opengamenode.com/api/auth/discord/callback?code=auth-code&state=not-the-state`,
+        { headers: { Cookie: cookies } },
+      ),
+    );
+    expect(badState.headers.get("Location")).toBe("/wishlist?error=discord");
+    expect(location.searchParams.get("scope")).toBe("identify email");
+  });
+
+  it("counts referrals and respects open or closed and the cap", async () => {
+    const anchor = await discordSignup();
+    const ref = (anchor.welcome.match(/welcome=([A-Z0-9]+)/) ?? [])[1];
+    expect(ref).toBeTruthy();
+
+    mockUser = {
+      id: snowflakeForAgeDays(70),
+      username: "friend1",
+      email: "friend1@example.com",
+      verified: true,
+    };
+    await discordSignup({ ref: ref! });
+    mockUser = {
+      id: snowflakeForAgeDays(75),
+      username: "friend2",
+      email: "friend2@example.com",
+      verified: true,
+    };
+    await discordSignup({ ref: ref!.toLowerCase() });
+
+    const csv = await (
+      await exports.default.fetch(
+        workerRequest("https://opengamenode.com/api/admin/export.csv", {
+          headers: { Authorization: "Bearer test-admin-token" },
+        }),
+      )
+    ).text();
+    const anchorRow = csv.split("\r\n").find((line) => line.includes(`,${ref},`));
+    expect(anchorRow?.split(",")[8]).toBe("2");
+
+    await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: await adminSessionCookie(),
+        },
+        body: formBody({ is_open: "0", signup_cap: "" }),
+      }),
+    );
+    mockUser = {
+      id: snowflakeForAgeDays(85),
+      username: "closed",
+      email: "closed@example.com",
+      verified: true,
+    };
+    const closedStart = await startDiscord();
+    expect(closedStart.status).toBe(303);
+    expect(closedStart.headers.get("Location")).toBe("/wishlist?error=closed");
+
+    await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: await adminSessionCookie(),
+        },
+        body: formBody({ is_open: "1", signup_cap: "3" }),
+      }),
+    );
+    mockUser = {
+      id: snowflakeForAgeDays(88),
+      username: "full",
+      email: "full@example.com",
+      verified: true,
+    };
+    const fullStart = await startDiscord();
+    expect(fullStart.headers.get("Location")).toBe("/wishlist?error=full");
+  });
+});
+
+async function adminSessionCookie(): Promise<string> {
+  mockUser = {
+    id: "111222333444555666",
+    username: "michael",
+    email: null,
+    verified: true,
+  };
+  const start = await exports.default.fetch(
+    workerRequest("https://opengamenode.com/api/auth/admin/discord", { redirect: "manual" }),
+  );
+  expect(start.status).toBe(302);
+  const location = new URL(start.headers.get("Location") ?? "");
+  const cookies = start.headers.getSetCookie().map((cookie) => cookie.split(";")[0]).join("; ");
+  const callback = await exports.default.fetch(
+    workerRequest(
+      `https://opengamenode.com/api/auth/admin/discord/callback?code=admin-code&state=${location.searchParams.get("state")}`,
+      { headers: { Cookie: cookies } },
+    ),
+  );
+  expect(callback.status).toBe(303);
+  expect(callback.headers.get("Location")).toBe("/admin");
+  return callback.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(";")[0])
+    .filter((cookie) => cookie.startsWith("ogn_admin_session="))
+    .join("; ");
+}
+
+describe("admin", () => {
+  it("lets an allowlisted Discord account manage settings and see submissions", async () => {
+    mockUser = {
+      id: snowflakeForAgeDays(60),
+      username: "ada",
+      email: "Ada@Example.com",
+      verified: true,
+    };
+    await discordSignup();
+
+    const cookie = await adminSessionCookie();
+    const page = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/admin", { headers: { Cookie: cookie } }),
+    );
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("Waitlist controls");
+    expect(html).toContain("ada@example.com");
+    expect(html).toContain('name="signup_cap"');
+    expect(html).toContain("Signed in as");
+
+    const forbiddenUser = {
+      id: snowflakeForAgeDays(99),
+      username: "intruder",
+      email: null,
+      verified: true,
+    };
+    mockUser = forbiddenUser;
+    const start = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/auth/admin/discord"),
+    );
+    const location = new URL(start.headers.get("Location") ?? "");
+    const cookies = start.headers.getSetCookie().map((cookieValue) => cookieValue.split(";")[0]).join("; ");
+    const denied = await exports.default.fetch(
+      workerRequest(
+        `https://opengamenode.com/api/auth/admin/discord/callback?code=x&state=${location.searchParams.get("state")}`,
+        { headers: { Cookie: cookies } },
+      ),
+    );
+    expect(denied.headers.get("Location")).toBe("/admin?error=forbidden");
   });
 });

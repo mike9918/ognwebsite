@@ -4,11 +4,13 @@
 interface __BaseEnv_Env {
 	DB: D1Database;
 	ASSETS: Fetcher;
+	MIN_DISCORD_ACCOUNT_AGE_DAYS: string;
 	TURNSTILE_SITE_KEY: string;
 	TURNSTILE_SECRET: string;
 	TURNSTILE_HOSTNAMES: string;
 	IP_HASH_SALT: string;
 	ADMIN_TOKEN: string;
+	ADMIN_DISCORD_IDS: string;
 	DISCORD_CLIENT_ID: string;
 	DISCORD_CLIENT_SECRET: string;
 	DISCORD_INVITE_URL: string;
@@ -25,7 +27,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET" | "TURNSTILE_HOSTNAMES" | "IP_HASH_SALT" | "ADMIN_TOKEN" | "DISCORD_CLIENT_ID" | "DISCORD_CLIENT_SECRET" | "DISCORD_INVITE_URL" | "PUBLIC_ORIGIN">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "MIN_DISCORD_ACCOUNT_AGE_DAYS" | "TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET" | "TURNSTILE_HOSTNAMES" | "IP_HASH_SALT" | "ADMIN_TOKEN" | "ADMIN_DISCORD_IDS" | "DISCORD_CLIENT_ID" | "DISCORD_CLIENT_SECRET" | "DISCORD_INVITE_URL" | "PUBLIC_ORIGIN">> {}
 }
 declare module "*.txt" {
 	const value: string;
