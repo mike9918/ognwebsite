@@ -26,8 +26,13 @@
     {
       "binding": "DB",
       "database_name": "ogn-waitlist",
+      "database_id": "68cfe627-4fe2-4966-9c38-3dd78bca1bbd",
       "migrations_dir": "migrations"
     }
+  ],
+  "routes": [
+    { "pattern": "opengamenode.com", "custom_domain": true },
+    { "pattern": "www.opengamenode.com", "custom_domain": true }
   ],
   "secrets": {
     "required": [
