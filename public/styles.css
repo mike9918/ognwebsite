@@ -202,8 +202,6 @@ input, select {
   font: inherit;
 }
 
-.split { display: grid; gap: 16px; }
-
 fieldset {
   margin: 0;
   padding: 0;
@@ -271,7 +269,6 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 
 @media (min-width: 720px) {
   .cards { grid-template-columns: repeat(3, 1fr); }
-  .split { grid-template-columns: 1fr 1fr; }
   .hero { padding-top: 72px; }
   .brand img { height: 44px; }
 }
