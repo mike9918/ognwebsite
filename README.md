@@ -19,13 +19,7 @@ npm run dev
 
 ## Database
 
-Create the remote database when you are ready to deploy:
-
-```sh
-npx wrangler d1 create ogn-waitlist
-```
-
-Put the printed `database_id` on the `d1_databases` entry in `wrangler.jsonc`, then apply the migration:
+The remote D1 database is `ogn-waitlist`. Apply new migrations with:
 
 ```sh
 npx wrangler d1 migrations apply ogn-waitlist --remote
@@ -73,7 +67,7 @@ npm run check
 | `/api/auth/discord` | Discord start, only when the client id and secret are set |
 | `/api/admin/export.csv` | Admin export |
 
-`www.opengamenode.com` redirects to the apex. There is no custom domain in `wrangler.jsonc`, so a deploy does not attach the apex until you add it.
+`www.opengamenode.com` redirects to the apex. Custom domains for the apex and `www` are in `wrangler.jsonc`.
 
 ## Brand
 
