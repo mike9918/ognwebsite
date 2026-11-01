@@ -53,9 +53,9 @@ export const content = {
       answer: "Yes. You will be able to upload your own mods and files over SFTP.",
     },
     {
-      question: "Can you restore my old PloudOS backup?",
+      question: "Can I bring my own world backup or server backup?",
       answer:
-        "If you still have the files, you will be able to upload them. OpenGameNode cannot recover anything from PloudOS.",
+        "Yes. If you still have the files, you will be able to upload them over SFTP. OpenGameNode cannot recover anything from PloudOS or another host for you.",
     },
     {
       question: "Who runs this?",
