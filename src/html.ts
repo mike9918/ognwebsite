@@ -149,13 +149,9 @@ export function wishlistPage(view: WishlistView): string {
             data-error-callback="__ognTurnstileError"
           ></div>`
     : `<p class="alert" role="alert">${escapeHtml(content.errors.unavailable)}</p>`;
-  // Stub callbacks before Turnstile loads so a fast success cannot miss them.
+  // Keep Turnstile callbacks in /wishlist.js only — CSP does not allow inline scripts.
   const head = view.siteKey
-    ? `<script>
-        window.__ognTurnstileSuccess = function () {};
-        window.__ognTurnstileExpired = function () {};
-        window.__ognTurnstileError = function () {};
-      </script>
+    ? `<script src="/wishlist.js" defer></script>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
     : "";
   const selectedRun = view.values.runType || "vanilla";
@@ -199,10 +195,7 @@ export function wishlistPage(view: WishlistView): string {
   return layout({
     title: `${content.form.heading} · ${content.name}`,
     current: "wishlist",
-    head,
-    scripts: view.discordEnabled && view.accepting && view.siteKey
-      ? `<script src="/wishlist.js" defer></script>`
-      : "",
+    head: view.discordEnabled && view.accepting ? head : "",
     main: `<div class="frame stack">
       <section class="hero">
         ${hero()}
