@@ -146,6 +146,11 @@ h3 { font-size: 1.15rem; margin-bottom: 8px; }
 
 .button:hover { background: var(--ogn-primary-hover); color: var(--ogn-on-primary); }
 
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .button-secondary {
   background: transparent;
   color: var(--ogn-text);
@@ -266,6 +271,49 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 }
 
 .footer-meta a { color: var(--ogn-text); font-weight: 700; }
+
+.admin { padding-block: 32px 64px; }
+.admin-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-settings { margin-top: 16px; }
+.admin-links { margin-top: 16px; }
+.notice {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--ogn-forest);
+  border-radius: var(--ogn-radius-control);
+  color: var(--ogn-primary);
+}
+.muted { color: var(--ogn-muted); font-size: 0.9rem; }
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ogn-border);
+  border-radius: var(--ogn-radius-card);
+  background: var(--ogn-surface);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ogn-border);
+  text-align: left;
+  vertical-align: top;
+}
+.admin-table th {
+  font-size: 0.85rem;
+  color: var(--ogn-muted);
+  font-weight: 700;
+}
+.admin-table tr:last-child td { border-bottom: 0; }
 
 @media (min-width: 720px) {
   .cards { grid-template-columns: repeat(3, 1fr); }

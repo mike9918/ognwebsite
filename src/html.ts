@@ -1,10 +1,8 @@
 import { content, type RunType } from "./content";
-import { escapeHtml, jsonScript } from "./http";
+import { escapeHtml } from "./http";
 import type { PublicEntry } from "./signup";
 
 export type FormValues = {
-  email: string;
-  discordUsername: string;
   runType: string;
   runDetail: string;
   ref: string;
@@ -12,6 +10,7 @@ export type FormValues = {
 
 export type WishlistView = {
   discordEnabled: boolean;
+  accepting: boolean;
   siteKey: string;
   values: FormValues;
   error: string | null;
@@ -139,49 +138,37 @@ export function wishlistPage(view: WishlistView): string {
 
   const described = view.error ? ` aria-describedby="form-alert"` : "";
   const turnstile = view.siteKey
-    ? `<div class="cf-turnstile" data-sitekey="${escapeHtml(view.siteKey)}" data-action="signup" data-theme="dark"></div>`
+    ? `<p class="note" data-turnstile-status>Complete the check below, then continue.</p>
+          <div
+            class="cf-turnstile"
+            data-sitekey="${escapeHtml(view.siteKey)}"
+            data-action="signup"
+            data-theme="dark"
+            data-callback="__ognTurnstileSuccess"
+            data-expired-callback="__ognTurnstileExpired"
+            data-error-callback="__ognTurnstileError"
+          ></div>`
     : `<p class="alert" role="alert">${escapeHtml(content.errors.unavailable)}</p>`;
-  const discord = view.discordEnabled
-    ? `<button class="button button-secondary" type="submit" formaction="/api/auth/discord">${escapeHtml(content.form.discordButton)}</button>`
-    : "";
+  // Stub callbacks before Turnstile loads so a fast success cannot miss them.
   const head = view.siteKey
-    ? `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+    ? `<script>
+        window.__ognTurnstileSuccess = function () {};
+        window.__ognTurnstileExpired = function () {};
+        window.__ognTurnstileError = function () {};
+      </script>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
     : "";
-  const copy = {
-    successHeading: content.success.heading,
-    existing: content.success.existing,
-    reached: content.success.reached,
-    place: content.success.place,
-    referral: content.success.referral,
-    linkLabel: content.success.linkLabel,
-    copy: content.success.copy,
-    copied: content.success.copied,
-    discord: content.success.discord,
-    generic: content.errors.generic,
-  };
+  const selectedRun = view.values.runType || "vanilla";
 
-  return layout({
-    title: `${content.form.heading} · ${content.name}`,
-    current: "wishlist",
-    head,
-    scripts: `${jsonScript("waitlist-copy", copy)}
-<script src="/wishlist.js" defer></script>`,
-    main: `<div class="frame stack">
-      <section class="hero">
-        ${hero()}
-      </section>
-      <section class="card" aria-labelledby="form-heading">
-        <h2 id="form-heading">${escapeHtml(content.form.heading)}</h2>
-        ${fieldError(view.error)}
-        <form id="waitlist-form" method="post" action="/api/waitlist"${described}>
-          <div>
-            <label for="email">${escapeHtml(content.form.emailLabel)}</label>
-            <input id="email" name="email" type="email" autocomplete="email" maxlength="254" spellcheck="false" required value="${escapeHtml(view.values.email)}">
-          </div>
-          <div>
-            <label for="discord-username">${escapeHtml(content.form.discordLabel)}</label>
-            <input id="discord-username" name="discord_username" type="text" maxlength="32" autocomplete="off" value="${escapeHtml(view.values.discordUsername)}">
-          </div>
+  let formBody = "";
+  if (!view.accepting) {
+    formBody = fieldError(view.error ?? content.errors.closed);
+  } else if (!view.discordEnabled) {
+    formBody = `<p class="alert" role="alert">${escapeHtml(content.errors.unavailable)}</p>`;
+  } else {
+    formBody = `${fieldError(view.error)}
+        <form id="waitlist-form" method="post" action="/api/auth/discord"${described}>
+          <p class="note">${escapeHtml(content.form.intro)}</p>
           <fieldset>
             <legend>${escapeHtml(content.form.runLegend)}</legend>
             ${(["vanilla", "plugins", "modpack"] as RunType[])
@@ -192,7 +179,7 @@ export function wishlistPage(view: WishlistView): string {
                     : runType === "plugins"
                       ? content.form.plugins
                       : content.form.modpack;
-                const checked = view.values.runType === runType ? " checked" : "";
+                const checked = selectedRun === runType ? " checked" : "";
                 return `<label class="choice"><input type="radio" name="run_type" value="${runType}"${checked} required> <span>${escapeHtml(label)}</span></label>`;
               })
               .join("")}
@@ -204,10 +191,25 @@ export function wishlistPage(view: WishlistView): string {
           <input type="hidden" name="ref" value="${escapeHtml(view.values.ref)}">
           ${turnstile}
           <div class="actions">
-            <button class="button" type="submit" data-email-submit>${escapeHtml(content.form.submit)}</button>
-            ${discord}
+            <button class="button" type="submit" data-discord-submit disabled>${escapeHtml(content.form.discordButton)}</button>
           </div>
-        </form>
+        </form>`;
+  }
+
+  return layout({
+    title: `${content.form.heading} · ${content.name}`,
+    current: "wishlist",
+    head,
+    scripts: view.discordEnabled && view.accepting && view.siteKey
+      ? `<script src="/wishlist.js" defer></script>`
+      : "",
+    main: `<div class="frame stack">
+      <section class="hero">
+        ${hero()}
+      </section>
+      <section class="card" aria-labelledby="form-heading">
+        <h2 id="form-heading">${escapeHtml(content.form.heading)}</h2>
+        ${formBody}
       </section>
       <section aria-labelledby="features-heading">
         <h2 id="features-heading">${escapeHtml(content.featuresHeading)}</h2>

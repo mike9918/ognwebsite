@@ -1,5 +1,9 @@
 import { content } from "./content";
 import {
+  isDiscordAccountOldEnough,
+  minDiscordAccountAgeDays,
+} from "./discord-age";
+import {
   canonicalOrigin,
   cleanText,
   clearCookie,
@@ -10,6 +14,8 @@ import {
   secretsMatch,
   setCookie,
 } from "./http";
+import { randomToken, signPayload, unsignPayload } from "./signed";
+import { signupBlockedReason } from "./settings";
 import {
   createSignup,
   normalizeEmail,
@@ -31,62 +37,18 @@ type PendingSignup = {
   state: string;
 };
 
-export function discordEnabled(env: Env): boolean {
+export type DiscordAuthError =
+  | "turnstile"
+  | "validation"
+  | "discord"
+  | "discord_email"
+  | "discord_new"
+  | "rate"
+  | "closed"
+  | "full";
+
+export function discordConfigured(env: Env): boolean {
   return Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET);
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function base64UrlToBytes(value: string): Uint8Array {
-  const padded = value.replaceAll("-", "+").replaceAll("_", "/") + "===".slice((value.length + 3) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-async function sign(payload: string, secret: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
-  );
-  return `${bytesToBase64Url(new TextEncoder().encode(payload))}.${bytesToBase64Url(signature)}`;
-}
-
-async function unsign(token: string, secret: string): Promise<string | null> {
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) return null;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const expected = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, base64UrlToBytes(payload)),
-  );
-  let provided: Uint8Array;
-  try {
-    provided = base64UrlToBytes(signature);
-  } catch {
-    return null;
-  }
-  if (expected.length !== provided.length) return null;
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= (expected[index] ?? 0) ^ (provided[index] ?? 0);
-  }
-  if (mismatch !== 0) return null;
-  return new TextDecoder().decode(base64UrlToBytes(payload));
 }
 
 export async function beginDiscord(
@@ -98,15 +60,15 @@ export async function beginDiscord(
     ref: string;
     token: string;
   },
-): Promise<{ location: string; cookies: string[] } | { error: "turnstile" | "validation" }> {
-  if (!discordEnabled(env)) return { error: "validation" };
+): Promise<{ location: string; cookies: string[] } | { error: DiscordAuthError }> {
+  if (!discordConfigured(env)) return { error: "validation" };
+  const blocked = await signupBlockedReason(env.DB);
+  if (blocked) return { error: blocked };
   const runType = normalizeRunType(fields.runType);
   if (!runType) return { error: "validation" };
   if (!(await verifyTurnstile(request, env, fields.token))) return { error: "turnstile" };
 
-  const stateBytes = new Uint8Array(32);
-  crypto.getRandomValues(stateBytes);
-  const state = bytesToBase64Url(stateBytes);
+  const state = randomToken(32);
   const pending: PendingSignup = {
     runType,
     runDetail: fields.runDetail,
@@ -128,7 +90,7 @@ export async function beginDiscord(
     location: authorize.toString(),
     cookies: [
       setCookie(STATE_COOKIE, state, { maxAge: PENDING_MAX_AGE, secure }),
-      setCookie(PENDING_COOKIE, await sign(JSON.stringify(pending), env.DISCORD_CLIENT_SECRET), {
+      setCookie(PENDING_COOKIE, await signPayload(JSON.stringify(pending), env.DISCORD_CLIENT_SECRET), {
         maxAge: PENDING_MAX_AGE,
         secure,
       }),
@@ -139,7 +101,7 @@ export async function beginDiscord(
 export async function finishDiscord(
   request: Request,
   env: Env,
-): Promise<{ entry: PublicEntry; cookies: string[] } | { error: "discord" | "discord_email" | "rate"; cookies: string[] }> {
+): Promise<{ entry: PublicEntry; cookies: string[] } | { error: DiscordAuthError; cookies: string[] }> {
   const secure = isSecure(request);
   const cleared = [clearCookie(STATE_COOKIE, secure), clearCookie(PENDING_COOKIE, secure)];
   const url = new URL(request.url);
@@ -151,7 +113,7 @@ export async function finishDiscord(
     return { error: "discord", cookies: cleared };
   }
 
-  const payload = await unsign(pendingCookie, env.DISCORD_CLIENT_SECRET);
+  const payload = await unsignPayload(pendingCookie, env.DISCORD_CLIENT_SECRET);
   if (!payload) return { error: "discord", cookies: cleared };
   let pending: PendingSignup;
   try {
@@ -189,9 +151,17 @@ export async function finishDiscord(
       id?: string;
       username?: string;
       email?: string | null;
+      verified?: boolean;
     };
+    if (!user.id) return { error: "discord", cookies: cleared };
     const email = normalizeEmail(user.email ?? "");
-    if (!user.id || !email) return { error: "discord_email", cookies: cleared };
+    if (!email || user.verified !== true) return { error: "discord_email", cookies: cleared };
+
+    const minAge = minDiscordAccountAgeDays(env.MIN_DISCORD_ACCOUNT_AGE_DAYS);
+    if (!isDiscordAccountOldEnough(user.id, minAge, new Date())) {
+      return { error: "discord_new", cookies: cleared };
+    }
+
     const runType = normalizeRunType(pending.runType);
     if (!runType) return { error: "discord", cookies: cleared };
     const username = cleanText(user.username ?? "", 32);
@@ -208,7 +178,7 @@ export async function finishDiscord(
       salt: env.IP_HASH_SALT,
       now: new Date(),
     });
-    if (!created.ok) return { error: "rate", cookies: cleared };
+    if (!created.ok) return { error: created.error, cookies: cleared };
     console.log(
       JSON.stringify({
         event: "waitlist_signup",
@@ -227,8 +197,13 @@ export async function finishDiscord(
   }
 }
 
-export function discordErrorMessage(error: "discord" | "discord_email" | "rate"): string {
+export function discordErrorMessage(error: DiscordAuthError): string {
   if (error === "discord_email") return content.errors.discordEmail;
+  if (error === "discord_new") return content.errors.discordNew;
   if (error === "rate") return content.errors.rate;
+  if (error === "closed") return content.errors.closed;
+  if (error === "full") return content.errors.full;
+  if (error === "turnstile") return content.errors.turnstile;
+  if (error === "validation") return content.errors.validation;
   return content.errors.discord;
 }
