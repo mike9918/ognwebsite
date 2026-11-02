@@ -104,6 +104,10 @@ export const content = {
   },
   admin: {
     saved: "Settings saved.",
+    deleted: "Waitlist entry deleted.",
+    deleteMissing: "That waitlist entry was already gone.",
+    delete: "Delete",
+    provision: "Provision",
     forbidden: "That Discord account is not allowed to manage the waitlist.",
     discordFailed: "Discord sign-in didn't complete. Please try again.",
     unavailable: "Admin sign-in isn't configured yet.",

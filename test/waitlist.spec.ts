@@ -358,4 +358,60 @@ describe("admin", () => {
     );
     expect(denied.headers.get("Location")).toBe("/admin?error=forbidden");
   });
+
+  it("deletes a waitlist entry from the admin session", async () => {
+    mockUser = {
+      id: snowflakeForAgeDays(61),
+      username: "deleteme",
+      email: "delete-me@example.com",
+      verified: true,
+    };
+    await discordSignup();
+
+    const cookie = await adminSessionCookie();
+    const before = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/admin", { headers: { Cookie: cookie } }),
+    );
+    const beforeHtml = await before.text();
+    expect(beforeHtml).toContain("delete-me@example.com");
+    expect(beforeHtml).toContain(">Provision<");
+    expect(beforeHtml).toContain('action="/api/admin/entries/delete"');
+
+    const idMatch = beforeHtml.match(
+      /delete-me@example\.com[\s\S]*?name="id" value="(\d+)"/,
+    );
+    expect(idMatch?.[1]).toBeTruthy();
+
+    const deleted = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/admin/entries/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+        },
+        body: formBody({ id: idMatch![1]! }),
+      }),
+    );
+    expect(deleted.status).toBe(303);
+    expect(deleted.headers.get("Location")).toBe("/admin?deleted=1");
+
+    const after = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/admin?deleted=1", { headers: { Cookie: cookie } }),
+    );
+    const afterHtml = await after.text();
+    expect(afterHtml).toContain("Waitlist entry deleted.");
+    expect(afterHtml).not.toContain("delete-me@example.com");
+
+    const missing = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/admin/entries/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: cookie,
+        },
+        body: formBody({ id: idMatch![1]! }),
+      }),
+    );
+    expect(missing.headers.get("Location")).toBe("/admin?deleted=missing");
+  });
 });

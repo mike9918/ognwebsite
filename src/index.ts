@@ -4,8 +4,10 @@ import {
   adminLoginPage,
   beginAdminDiscord,
   clearAdminSession,
+  deleteSubmission,
   finishAdminDiscord,
   listSubmissions,
+  parseEntryId,
   parseSettingsForm,
   readAdminSession,
   getSettings,
@@ -236,13 +238,32 @@ async function adminGet(request: Request, env: Env): Promise<Response> {
   }
   const page = Number(url.searchParams.get("page") ?? "1");
   const [settings, list] = await Promise.all([getSettings(env.DB), listSubmissions(env.DB, page)]);
-  const notice = url.searchParams.get("saved") === "1" ? content.admin.saved : null;
-  const error = url.searchParams.get("settings") === "invalid" ? "Check the settings and try again." : null;
+  const notice =
+    url.searchParams.get("saved") === "1"
+      ? content.admin.saved
+      : url.searchParams.get("deleted") === "1"
+        ? content.admin.deleted
+        : null;
+  const error =
+    url.searchParams.get("settings") === "invalid"
+      ? "Check the settings and try again."
+      : url.searchParams.get("deleted") === "missing"
+        ? content.admin.deleteMissing
+        : null;
   return htmlResponse(
     adminDashboardPage({ session, settings, list, notice, error }),
     200,
     request.method,
   );
+}
+
+function adminRedirect(params: Record<string, string>, pageRaw: unknown = null): Response {
+  const search = new URLSearchParams(params);
+  if (typeof pageRaw === "string" && /^\d+$/.test(pageRaw) && Number(pageRaw) > 1) {
+    search.set("page", pageRaw);
+  }
+  const query = search.toString();
+  return redirect(query ? `/admin?${query}` : "/admin", 303);
 }
 
 async function handleAdminSettings(request: Request, env: Env): Promise<Response> {
@@ -262,6 +283,23 @@ async function handleAdminSettings(request: Request, env: Env): Promise<Response
     now: new Date(),
   });
   return redirect("/admin?saved=1", 303);
+}
+
+async function handleAdminDelete(request: Request, env: Env): Promise<Response> {
+  const session = await readAdminSession(request, env);
+  if (!session) return redirect("/admin?error=forbidden", 303);
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return adminRedirect({ deleted: "missing" });
+  }
+  const id = parseEntryId(form.get("id"));
+  const pageRaw = form.get("page");
+  if (id === null) return adminRedirect({ deleted: "missing" }, pageRaw);
+  const result = await deleteSubmission(env.DB, id);
+  if (result === "missing") return adminRedirect({ deleted: "missing" }, pageRaw);
+  return adminRedirect({ deleted: "1" }, pageRaw);
 }
 
 function isAssetPath(pathname: string): boolean {
@@ -314,6 +352,9 @@ export default {
       }
       if (method === "POST" && url.pathname === "/api/admin/settings") {
         return handleAdminSettings(request, env);
+      }
+      if (method === "POST" && url.pathname === "/api/admin/entries/delete") {
+        return handleAdminDelete(request, env);
       }
       if (method === "GET" && url.pathname === "/api/admin/export.csv") return handleExport(request, env);
       if (method === "POST" && url.pathname === "/api/waitlist") {
