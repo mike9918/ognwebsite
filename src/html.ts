@@ -138,11 +138,27 @@ export function wishlistPage(view: WishlistView): string {
 
   const described = view.error ? ` aria-describedby="form-alert"` : "";
   const turnstile = view.siteKey
-    ? `<div class="cf-turnstile" data-sitekey="${escapeHtml(view.siteKey)}" data-action="signup" data-theme="dark"></div>`
+    ? `<p class="note" data-turnstile-status>Complete the check below, then continue.</p>
+          <div
+            class="cf-turnstile"
+            data-sitekey="${escapeHtml(view.siteKey)}"
+            data-action="signup"
+            data-theme="dark"
+            data-callback="__ognTurnstileSuccess"
+            data-expired-callback="__ognTurnstileExpired"
+            data-error-callback="__ognTurnstileError"
+          ></div>`
     : `<p class="alert" role="alert">${escapeHtml(content.errors.unavailable)}</p>`;
+  // Stub callbacks before Turnstile loads so a fast success cannot miss them.
   const head = view.siteKey
-    ? `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+    ? `<script>
+        window.__ognTurnstileSuccess = function () {};
+        window.__ognTurnstileExpired = function () {};
+        window.__ognTurnstileError = function () {};
+      </script>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
     : "";
+  const selectedRun = view.values.runType || "vanilla";
 
   let formBody = "";
   if (!view.accepting) {
@@ -163,7 +179,7 @@ export function wishlistPage(view: WishlistView): string {
                     : runType === "plugins"
                       ? content.form.plugins
                       : content.form.modpack;
-                const checked = view.values.runType === runType ? " checked" : "";
+                const checked = selectedRun === runType ? " checked" : "";
                 return `<label class="choice"><input type="radio" name="run_type" value="${runType}"${checked} required> <span>${escapeHtml(label)}</span></label>`;
               })
               .join("")}
@@ -175,7 +191,7 @@ export function wishlistPage(view: WishlistView): string {
           <input type="hidden" name="ref" value="${escapeHtml(view.values.ref)}">
           ${turnstile}
           <div class="actions">
-            <button class="button" type="submit">${escapeHtml(content.form.discordButton)}</button>
+            <button class="button" type="submit" data-discord-submit disabled>${escapeHtml(content.form.discordButton)}</button>
           </div>
         </form>`;
   }
@@ -184,6 +200,9 @@ export function wishlistPage(view: WishlistView): string {
     title: `${content.form.heading} · ${content.name}`,
     current: "wishlist",
     head,
+    scripts: view.discordEnabled && view.accepting && view.siteKey
+      ? `<script src="/wishlist.js" defer></script>`
+      : "",
     main: `<div class="frame stack">
       <section class="hero">
         ${hero()}

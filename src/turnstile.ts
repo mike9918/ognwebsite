@@ -2,6 +2,7 @@ const SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverif
 
 type SiteverifyResult = {
   success?: boolean;
+  "error-codes"?: string[];
   action?: string;
   hostname?: string;
   metadata?: { result_with_testing_key?: boolean };
@@ -42,9 +43,27 @@ export async function verifyTurnstile(
     return false;
   }
 
-  if (result.success !== true || !result.hostname) return false;
-  if (!hostnames.has(result.hostname.toLowerCase())) return false;
+  if (result.success !== true) {
+    console.warn(
+      JSON.stringify({
+        event: "turnstile_rejected",
+        errorCodes: result["error-codes"] ?? [],
+      }),
+    );
+    return false;
+  }
+  if (!result.hostname || !hostnames.has(result.hostname.toLowerCase())) {
+    console.warn(
+      JSON.stringify({
+        event: "turnstile_hostname",
+        hostname: result.hostname ?? "",
+      }),
+    );
+    return false;
+  }
   if (result.action === "signup") return true;
   const testingKey = result.metadata?.result_with_testing_key === true;
-  return testingKey && (result.action === undefined || result.action === "");
+  if (testingKey && (result.action === undefined || result.action === "")) return true;
+  console.warn(JSON.stringify({ event: "turnstile_action", action: result.action ?? "" }));
+  return false;
 }
