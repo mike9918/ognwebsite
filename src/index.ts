@@ -20,12 +20,18 @@ import {
   canonicalOrigin,
   cleanText,
   isSecure,
+  relaxFramingForPreview,
   secretsMatch,
   securityHeaders,
 } from "./http";
 import {
+  faqPage,
+  guidePage,
+  helpIndexPage,
   homePage,
+  legalPage,
   notFoundPage,
+  supporterPage,
   textPage,
   wishlistPage,
   type FormValues,
@@ -33,6 +39,8 @@ import {
 } from "./html";
 import { findByRef, normalizeRef, toPublic } from "./signup";
 import { signupBlockedReason } from "./settings";
+import { findGuide } from "./guides";
+import { aupBody, privacyBody, termsBody } from "./legal";
 
 function emptyValues(ref: string): FormValues {
   return {
@@ -82,11 +90,12 @@ function inviteUrl(env: Env): string | null {
 
 async function renderWishlist(
   request: Request,
+  env: Env,
   view: WishlistView,
   status: number,
   cookies: string[] = [],
 ): Promise<Response> {
-  return htmlResponse(wishlistPage(view), status, request.method, cookies);
+  return htmlResponse(wishlistPage(view, inviteUrl(env)), status, request.method, cookies);
 }
 
 function wantsJson(request: Request): boolean {
@@ -184,6 +193,26 @@ function knownWishlistError(code: string): string | null {
   return null;
 }
 
+async function homeGet(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
+  const blocked = await signupBlockedReason(env.DB);
+  const view: WishlistView = {
+    discordEnabled: discordConfigured(env),
+    accepting: blocked === null,
+    siteKey: env.TURNSTILE_SITE_KEY,
+    values: emptyValues(ref),
+    error:
+      blocked === "closed"
+        ? content.errors.closed
+        : blocked === "full"
+          ? content.errors.full
+          : null,
+    success: null,
+  };
+  return htmlResponse(homePage(view, inviteUrl(env)), 200, request.method);
+}
+
 async function wishlistGet(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const welcome = normalizeRef(url.searchParams.get("welcome") ?? "");
@@ -200,7 +229,7 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
         canonicalOrigin(request, env.PUBLIC_ORIGIN),
         false,
       );
-      return renderWishlist(request, {
+      return renderWishlist(request, env, {
         discordEnabled: false,
         accepting: true,
         siteKey: "",
@@ -210,7 +239,7 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
       }, 200);
     }
   }
-  return renderWishlist(request, {
+  return renderWishlist(request, env, {
     discordEnabled: discordConfigured(env),
     accepting: blocked === null,
     siteKey: env.TURNSTILE_SITE_KEY,
@@ -306,8 +335,7 @@ function isAssetPath(pathname: string): boolean {
   return /\.[a-zA-Z0-9]+$/.test(pathname);
 }
 
-export default {
-  async fetch(request, env): Promise<Response> {
+async function route(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.hostname === "www.opengamenode.com") {
@@ -362,12 +390,40 @@ export default {
       }
 
       if (method === "GET" || method === "HEAD") {
-        if (url.pathname === "/") return htmlResponse(homePage(), 200, method);
+        if (url.pathname === "/") return homeGet(request, env);
         if (url.pathname === "/wishlist") return wishlistGet(request, env);
+        if (url.pathname === "/faq") return htmlResponse(faqPage(inviteUrl(env)), 200, method);
+        if (url.pathname === "/supporter") {
+          return htmlResponse(supporterPage(inviteUrl(env)), 200, method);
+        }
+        if (url.pathname === "/help") {
+          return htmlResponse(helpIndexPage(inviteUrl(env)), 200, method);
+        }
+        if (url.pathname.startsWith("/help/")) {
+          const guide = findGuide(url.pathname.slice("/help/".length));
+          if (guide) return htmlResponse(guidePage(guide, inviteUrl(env)), 200, method);
+        }
         if (url.pathname === "/admin") return adminGet(request, env);
-        if (url.pathname === "/terms") return htmlResponse(textPage(content.terms.title, content.terms.body), 200, method);
+        if (url.pathname === "/terms") {
+          return htmlResponse(
+            legalPage({ title: content.legal.terms, body: termsBody, path: "/terms" }, inviteUrl(env)),
+            200,
+            method,
+          );
+        }
         if (url.pathname === "/privacy") {
-          return htmlResponse(textPage(content.privacy.title, content.privacy.body), 200, method);
+          return htmlResponse(
+            legalPage({ title: content.legal.privacy, body: privacyBody, path: "/privacy" }, inviteUrl(env)),
+            200,
+            method,
+          );
+        }
+        if (url.pathname === "/aup") {
+          return htmlResponse(
+            legalPage({ title: content.legal.aup, body: aupBody, path: "/aup" }, inviteUrl(env)),
+            200,
+            method,
+          );
         }
       }
 
@@ -376,7 +432,7 @@ export default {
         if (asset.status !== 404) return assetResponse(asset);
       }
 
-      return htmlResponse(notFoundPage(), 404, method);
+      return htmlResponse(notFoundPage(inviteUrl(env)), 404, method);
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -384,7 +440,18 @@ export default {
           message: error instanceof Error ? error.message : "error",
         }),
       );
-      return htmlResponse(textPage(content.name, content.errors.generic), 500, request.method);
+      return htmlResponse(
+        textPage(content.name, content.errors.generic, inviteUrl(env)),
+        500,
+        request.method,
+      );
     }
+}
+
+export default {
+  async fetch(request, env): Promise<Response> {
+    // Framing is relaxed for local/preview hosts so the Browser panel can embed
+    // the page; production keeps X-Frame-Options: DENY.
+    return relaxFramingForPreview(request, await route(request, env));
   },
 } satisfies ExportedHandler<Env>;

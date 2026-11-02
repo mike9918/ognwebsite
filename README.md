@@ -1,6 +1,6 @@
 # OpenGameNode
 
-The public site for OpenGameNode. The homepage is `/`. The waitlist form is `/wishlist`. Admin is `/admin`. Terms and privacy are placeholders until the legal drafts are ready.
+The public site for OpenGameNode. The homepage is `/` and carries the Discord waitlist form itself. `/wishlist` still exists as the focused sign-up page that Discord OAuth and referral links return to. Admin is `/admin`.
 
 This is a Cloudflare Worker with static assets and a D1 database. It does not include the game panel. That will be `panel.opengamenode.com`.
 
@@ -71,10 +71,14 @@ npm run check
 
 | Path | What it is |
 | --- | --- |
-| `/` | Homepage. `/?ref=` redirects to `/wishlist?ref=` |
+| `/` | Frontpage: hero, how it works, features, sessions, games, Supporter teaser, FAQ preview, waitlist form. `/?ref=` redirects to `/wishlist?ref=` |
 | `/wishlist` | Discord waitlist form and success screen |
+| `/faq` | Full FAQ, final approved copy |
+| `/supporter` | Supporter tier, $1.99/month. Checkout button is a placeholder until Stripe is live |
+| `/help` | Index of the five help guides |
+| `/help/<slug>` | `first-server`, `invite-friends`, `upload-a-world`, `backups`, `supporter-billing` |
+| `/terms`, `/privacy`, `/aup` | Legal pages rendered from `src/legal.ts` |
 | `/admin` | Discord-gated admin: submissions, delete, open/close, cap |
-| `/terms`, `/privacy` | Placeholders |
 | `/api/auth/discord` | Waitlist Discord start |
 | `/api/auth/admin/discord` | Admin Discord start |
 | `/api/admin/settings` | Save open/close and cap |
@@ -85,4 +89,12 @@ npm run check
 
 ## Brand
 
-`public/brand/` has the four supplied logo files, unchanged. Visitor-facing copy is in `src/content.ts`.
+`public/brand/` has the four supplied logo files, unchanged, plus `og-default.png` for link previews. Visitor-facing copy is in `src/content.ts`. Legal text is in `src/legal.ts` and help guides are in `src/guides.ts`; both are Markdown rendered by `src/markdown.ts`. The approved legal drafts Michael reviewed are kept in `content/legal/` for reference.
+
+## Copy sources
+
+- Homepage, FAQ, Supporter and footer copy: AUD-16 / AUD-20 final text, delivered Nov 1 2026.
+- Legal drafts: AUD-20 final attachments, mirrored in `src/legal.ts`.
+- Help guides: drafted from the confirmed product facts. Placeholder-free, but worth a read before publishing.
+
+Ads are not on this site. AdSense and the consent banner belong to the panel at `panel.opengamenode.com`.

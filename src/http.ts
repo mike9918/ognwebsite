@@ -122,6 +122,36 @@ export function securityHeaders(): Record<string, string> {
   };
 }
 
+// The Browser panel embeds a preview in a frame, which X-Frame-Options: DENY
+// refuses with a blank page. Preview hosts are owner-only, so framing is allowed
+// there; production hosts keep DENY and frame-ancestors 'none'.
+const PREVIEW_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
+
+function isPreviewHost(host: string): boolean {
+  const name = host.trim().toLowerCase().replace(/:\d+$/, "");
+  return PREVIEW_HOSTS.has(name) || name.endsWith(".style.dev") || name.endsWith(".workers.dev");
+}
+
+function isPreviewTraffic(request: Request): boolean {
+  const host = request.headers.get("Host") ?? new URL(request.url).hostname;
+  if (isPreviewHost(host)) return true;
+  // wrangler dev rewrites the Host to the configured route, so the host cannot
+  // identify a preview. Every request through the public origin carries the
+  // Cloudflare edge marker; its absence means local dev or a preview proxy.
+  return !request.headers.get("cf-ray");
+}
+
+export function relaxFramingForPreview(request: Request, response: Response): Response {
+  if (!isPreviewTraffic(request)) return response;
+  const headers = new Headers(response.headers);
+  headers.delete("X-Frame-Options");
+  const csp = headers.get("Content-Security-Policy");
+  if (csp?.includes("frame-ancestors 'none'")) {
+    headers.set("Content-Security-Policy", csp.replace("frame-ancestors 'none'", "frame-ancestors *"));
+  }
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export function jsonScript(id: string, value: unknown): string {
   const json = JSON.stringify(value).replace(/</g, "\\u003c");
   return `<script type="application/json" id="${escapeHtml(id)}">${json}</script>`;

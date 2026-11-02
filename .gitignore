@@ -4,3 +4,6 @@ node_modules/
 dist/
 *.tsbuildinfo
 .DS_Store
+
+# Pillow font cache used by scripts/build-og.py
+scripts/.cache/

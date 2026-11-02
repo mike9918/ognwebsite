@@ -127,12 +127,13 @@ describe("pages", () => {
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Free game servers. More time to play.");
-    expect(html).toContain('href="/wishlist"');
+    expect(html).toContain('action="/api/auth/discord"');
+    expect(html).toContain("Open to everyone");
 
     const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?ref=CODE12"));
     const waitlist = await page.text();
     expect(waitlist).toContain("Continue with Discord");
-    expect(waitlist).toContain("Why Discord to join?");
+    expect(waitlist).toContain("Is it really free?");
     expect(waitlist).toContain('value="CODE12"');
     expect(waitlist).not.toContain('name="email"');
     expect(waitlist).not.toContain("/api/waitlist");
