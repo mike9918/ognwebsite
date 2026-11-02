@@ -103,14 +103,17 @@ export function securityHeaders(): Record<string, string> {
     "Content-Security-Policy": [
       "default-src 'none'",
       "base-uri 'none'",
-      "form-action 'self'",
+      // Discord OAuth: form POST to self then 302 to discord.com — Chrome applies
+      // form-action to that redirect, which is why admin <a> worked and waitlist did not.
+      "form-action 'self' https://discord.com",
       "frame-ancestors 'none'",
       "img-src 'self'",
       "font-src 'self'",
       "style-src 'self'",
       "script-src 'self' https://challenges.cloudflare.com",
-      "frame-src https://challenges.cloudflare.com",
-      "connect-src 'self' https://challenges.cloudflare.com",
+      "frame-src https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
+      // Turnstile challenge workers use https + data: URLs for connect.
+      "connect-src 'self' data: https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
     ].join("; "),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",

@@ -161,6 +161,28 @@ describe("discord sign-up", () => {
     expect(emailOnly.status).toBe(410);
   });
 
+  it("returns a Discord location as JSON for the waitlist script", async () => {
+    const response = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/auth/discord", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          "CF-Connecting-IP": nextIp(),
+          "CF-IPCountry": "US",
+        },
+        body: formBody({
+          run_type: "vanilla",
+          "cf-turnstile-response": "pass",
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as { location?: string };
+    expect(payload.location).toMatch(/^https:\/\/discord\.com\/oauth2\/authorize\?/);
+    expect(response.headers.getSetCookie().join("\n")).toContain("ogn_oauth_state=");
+  });
+
   it("rejects unverified email, new accounts, and bad state", async () => {
     mockUser = { ...mockUser, verified: false, id: snowflakeForAgeDays(90) };
     const unverifiedStart = await startDiscord();
