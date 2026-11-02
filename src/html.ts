@@ -48,7 +48,6 @@ function footer(): string {
     <div class="frame">
       <p>${escapeHtml(content.footerDisclaimer)}</p>
       <p class="footer-meta">
-        <span>${escapeHtml(content.copyright)}</span>
         <a href="/terms">${escapeHtml(content.termsLink)}</a>
         <a href="/privacy">${escapeHtml(content.privacyLink)}</a>
       </p>

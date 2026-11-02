@@ -55,16 +55,15 @@ export const content = {
     {
       question: "Can I bring my own world backup or server backup?",
       answer:
-        "Yes. If you still have the files, you will be able to upload them over SFTP. OpenGameNode cannot recover anything from PloudOS or another host for you.",
+        "Yes. If you still have the files, you will be able to upload them over SFTP. OpenGameNode cannot recover files from another host for you.",
     },
     {
       question: "Who runs this?",
-      answer: "OpenGameNode is run by MH Tech Solutions.",
+      answer: "OpenGameNode.",
     },
   ],
   footerDisclaimer:
-    "OpenGameNode is not affiliated with PloudOS or its creator. NOT AN OFFICIAL MINECRAFT SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
-  copyright: "© 2026 MH Tech Solutions",
+    "NOT AN OFFICIAL MINECRAFT SERVICE. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
   navWaitlist: "Waitlist",
   termsLink: "Terms",
   privacyLink: "Privacy",
@@ -110,12 +109,12 @@ export const content = {
     unavailable: "Admin sign-in isn't configured yet.",
   },
   terms: {
-    title: "Terms",
-    body: "These terms are a placeholder. The full terms are not published yet.",
+    title: "OpenGameNode Terms",
+    body: "These OpenGameNode terms are a placeholder. The full terms are not published yet.",
   },
   privacy: {
-    title: "Privacy",
-    body: "This privacy notice is a placeholder. The full notice is not published yet.",
+    title: "OpenGameNode Privacy",
+    body: "This OpenGameNode privacy notice is a placeholder. The full notice is not published yet.",
   },
   notFound: {
     title: "That page isn't here.",
