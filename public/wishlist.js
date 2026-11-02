@@ -18,6 +18,13 @@
     }
   };
 
+  const showStatus = (message) => {
+    if (status instanceof HTMLElement) {
+      status.hidden = false;
+      status.textContent = message;
+    }
+  };
+
   const syncFromToken = () => setReady(Boolean(tokenValue()));
 
   window.__ognTurnstileSuccess = () => setReady(true);
@@ -31,13 +38,41 @@
   syncFromToken();
 
   form.addEventListener("submit", (event) => {
-    if (tokenValue()) return;
     event.preventDefault();
-    setReady(false);
-    if (status instanceof HTMLElement) {
-      status.hidden = false;
-      status.textContent = "Complete the check below, then continue.";
+    if (!tokenValue()) {
+      setReady(false);
+      showStatus("Complete the check below, then continue.");
+      if (window.turnstile) window.turnstile.reset();
+      return;
     }
-    if (window.turnstile) window.turnstile.reset();
+
+    if (button instanceof HTMLButtonElement) button.disabled = true;
+    showStatus("Redirecting to Discord…");
+
+    fetch(form.action, {
+      method: "POST",
+      body: new FormData(form),
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+        if (response.ok && payload && typeof payload.location === "string") {
+          window.location.assign(payload.location);
+          return;
+        }
+        const error = payload && typeof payload.error === "string" ? payload.error : "turnstile";
+        window.location.assign(`/wishlist?error=${encodeURIComponent(error)}`);
+      })
+      .catch(() => {
+        setReady(Boolean(tokenValue()));
+        showStatus("Something went wrong. Please try again.");
+        if (window.turnstile) window.turnstile.reset();
+      });
   });
 })();

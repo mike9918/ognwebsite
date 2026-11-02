@@ -87,11 +87,32 @@ async function renderWishlist(
   return htmlResponse(wishlistPage(view), status, request.method, cookies);
 }
 
+function wantsJson(request: Request): boolean {
+  const accept = request.headers.get("Accept") ?? "";
+  return accept.includes("application/json");
+}
+
+function jsonResponse(
+  body: unknown,
+  status: number,
+  cookies: string[] = [],
+): Response {
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...securityHeaders(),
+  });
+  for (const cookie of cookies) headers.append("Set-Cookie", cookie);
+  return new Response(JSON.stringify(body), { status, headers });
+}
+
 async function handleDiscordStart(request: Request, env: Env): Promise<Response> {
+  const asJson = wantsJson(request);
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
+    if (asJson) return jsonResponse({ error: "validation" }, 400);
     return redirect("/wishlist?error=validation", 303);
   }
   const read = (name: string) => {
@@ -106,8 +127,12 @@ async function handleDiscordStart(request: Request, env: Env): Promise<Response>
     token: typeof token === "string" ? token : "",
   });
   if ("error" in result) {
+    if (asJson) return jsonResponse({ error: result.error }, 400);
     return redirect(`/wishlist?error=${result.error}`, 303);
   }
+  // Prefer JSON for the waitlist script so navigation to Discord is a top-level
+  // assign, not a form 302 (which Chrome can block via form-action).
+  if (asJson) return jsonResponse({ location: result.location }, 200, result.cookies);
   return redirect(result.location, 302, result.cookies);
 }
 
