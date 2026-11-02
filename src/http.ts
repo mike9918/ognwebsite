@@ -112,7 +112,8 @@ export function securityHeaders(): Record<string, string> {
       "style-src 'self'",
       "script-src 'self' https://challenges.cloudflare.com",
       "frame-src https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
-      "connect-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
+      // Turnstile challenge workers use https + data: URLs for connect.
+      "connect-src 'self' data: https://challenges.cloudflare.com https://*.challenges.cloudflare.com",
     ].join("; "),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
