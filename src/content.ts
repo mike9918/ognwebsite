@@ -179,7 +179,7 @@ export const content = {
   },
   footer: {
     operator:
-      "OpenGameNode is operated by MH Tech Solutions, a sole proprietorship owned by Michael Herman. Contact: support@opengamenode.com",
+      "OpenGameNode is operated by MH Tech Solutions. Contact: support@opengamenode.com",
     minecraft:
       "NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
   },

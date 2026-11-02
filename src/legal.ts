@@ -12,9 +12,9 @@ Welcome to OpenGameNode. These terms are the deal between you and OpenGameNode (
 
 OpenGameNode is a free, ad-supported Minecraft server hosting service at opengamenode.com. Servers are managed through the web panel at panel.opengamenode.com. Discord is used for sign-in, community and support only.
 
-OpenGameNode is operated by MH Tech Solutions, a sole proprietorship owned by Michael Herman.
+OpenGameNode is operated by MH Tech Solutions.
 
-- Mailing address: MH Tech Solutions, 891 E High St, Bryan, OH 43506
+- Mailing address: 891 E High St, Bryan, OH 43506
 - Support: support@opengamenode.com
 - Abuse and admin: admin@opengamenode.com
 
@@ -113,7 +113,7 @@ If any part of these terms is found unenforceable, the rest stays in force. Noth
 
 ## 12. Contact
 
-MH Tech Solutions, 891 E High St, Bryan, OH 43506. Support: support@opengamenode.com. Abuse and admin: admin@opengamenode.com.
+891 E High St, Bryan, OH 43506. Support: support@opengamenode.com. Abuse and admin: admin@opengamenode.com.
 `);
 
 export const privacyBody = legalDoc(`
@@ -121,7 +121,7 @@ This is the short version of what OpenGameNode keeps and why.
 
 ## Who we are
 
-OpenGameNode is operated by MH Tech Solutions, a sole proprietorship owned by Michael Herman. Mailing address: MH Tech Solutions, 891 E High St, Bryan, OH 43506. For privacy questions or requests, email support@opengamenode.com.
+OpenGameNode is operated by MH Tech Solutions. Mailing address: 891 E High St, Bryan, OH 43506. For privacy questions or requests, email support@opengamenode.com.
 
 ## What we keep
 
@@ -210,5 +210,5 @@ Report abuse to admin@opengamenode.com. Include the server, account and what hap
 
 ---
 
-Operated by MH Tech Solutions, a sole proprietorship owned by Michael Herman.
+Operated by MH Tech Solutions.
 `);
