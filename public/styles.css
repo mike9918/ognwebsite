@@ -315,6 +315,34 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 }
 .admin-table tr:last-child td { border-bottom: 0; }
 
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-form { display: inline; margin: 0; }
+
+.button-danger {
+  background: transparent;
+  color: var(--ogn-danger);
+  border: 1px solid var(--ogn-danger-border);
+}
+
+.button-danger:hover {
+  background: color-mix(in srgb, var(--ogn-danger-border) 28%, transparent);
+  color: var(--ogn-danger);
+}
+
+.admin-table .button,
+.admin-table .button-secondary,
+.admin-table .button-danger {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
 @media (min-width: 720px) {
   .cards { grid-template-columns: repeat(3, 1fr); }
   .hero { padding-top: 72px; }

@@ -171,6 +171,21 @@ export async function listSubmissions(
   };
 }
 
+export async function deleteSubmission(
+  db: D1Database,
+  id: number,
+): Promise<"deleted" | "missing"> {
+  if (!Number.isInteger(id) || id < 1) return "missing";
+  const result = await db.prepare("DELETE FROM waitlist WHERE id = ?").bind(id).run();
+  return (result.meta.changes ?? 0) > 0 ? "deleted" : "missing";
+}
+
+export function parseEntryId(raw: unknown): number | null {
+  if (typeof raw !== "string" || !/^\d{1,18}$/.test(raw.trim())) return null;
+  const id = Number(raw.trim());
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 function adminLayout(title: string, body: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -196,6 +211,7 @@ function adminLayout(title: string, body: string): string {
     </div>
   </header>
   <main id="content"><div class="frame stack admin">${body}</div></main>
+  <script src="/admin.js" defer></script>
 </body>
 </html>`;
 }
@@ -233,8 +249,12 @@ export function adminDashboardPage(options: {
       ? `<a class="button button-secondary" href="/admin?page=${options.list.page + 1}">Next</a>`
       : "";
   const rows = options.list.rows
-    .map(
-      (row) => `<tr>
+    .map((row) => {
+      const pageField =
+        options.list.page > 1
+          ? `<input type="hidden" name="page" value="${options.list.page}">`
+          : "";
+      return `<tr>
       <td>${row.id}</td>
       <td>${escapeHtml(row.email)}</td>
       <td>${escapeHtml(row.discord_username ?? "")}<div class="muted">${escapeHtml(row.discord_id ?? "")}</div></td>
@@ -243,8 +263,18 @@ export function adminDashboardPage(options: {
       <td>${row.referral_count}</td>
       <td>${escapeHtml(row.country ?? "")}</td>
       <td>${escapeHtml(row.created_at)}</td>
-    </tr>`,
-    )
+      <td>
+        <div class="row-actions">
+          <button class="button button-secondary" type="button" disabled title="Panel provisioning is not ready yet">${escapeHtml(content.admin.provision)}</button>
+          <form method="post" action="/api/admin/entries/delete" class="inline-form" data-confirm-delete>
+            <input type="hidden" name="id" value="${row.id}">
+            ${pageField}
+            <button class="button button-danger" type="submit">${escapeHtml(content.admin.delete)}</button>
+          </form>
+        </div>
+      </td>
+    </tr>`;
+    })
     .join("");
 
   return adminLayout(
@@ -280,15 +310,15 @@ export function adminDashboardPage(options: {
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Ref</th><th>Referrals</th><th>Country</th><th>Created</th>
+              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Ref</th><th>Referrals</th><th>Country</th><th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="8">No submissions yet.</td></tr>`}
+            ${rows || `<tr><td colspan="9">No submissions yet.</td></tr>`}
           </tbody>
         </table>
       </div>
-      <p class="note">Page ${options.list.page} of ${totalPages}.</p>
+      <p class="note">Page ${options.list.page} of ${totalPages}. Provision will create a panel account later.</p>
       <div class="actions">${prev}${next}</div>
     </section>`,
   );
