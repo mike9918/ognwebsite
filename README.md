@@ -73,11 +73,12 @@ npm run check
 | --- | --- |
 | `/` | Homepage. `/?ref=` redirects to `/wishlist?ref=` |
 | `/wishlist` | Discord waitlist form and success screen |
-| `/admin` | Discord-gated admin: submissions, open/close, cap |
+| `/admin` | Discord-gated admin: submissions, delete, open/close, cap |
 | `/terms`, `/privacy` | Placeholders |
 | `/api/auth/discord` | Waitlist Discord start |
 | `/api/auth/admin/discord` | Admin Discord start |
 | `/api/admin/settings` | Save open/close and cap |
+| `/api/admin/entries/delete` | Delete one waitlist row (admin session) |
 | `/api/admin/export.csv` | CSV export (admin session or bearer token) |
 
 `www.opengamenode.com` redirects to the apex. Custom domains for the apex and `www` are in `wrangler.jsonc`.
