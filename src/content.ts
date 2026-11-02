@@ -59,7 +59,7 @@ export const content = {
     },
     {
       question: "Who runs this?",
-      answer: "OpenGameNode.",
+      answer: "OpenGameNode. Join the Discord for more information.",
     },
   ],
   footerDisclaimer:
