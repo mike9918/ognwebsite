@@ -66,7 +66,7 @@ function installFetchMock(): void {
       panelUser = { uuid: USER_UUID, email: String(body.email), external_id: String(body.external_id) };
       return Response.json({ user: panelUser });
     }
-    if (url === `${PANEL}/api/admin/users/${USER_UUID}/oauth_links` && method === "POST") {
+    if (url === `${PANEL}/api/admin/users/${USER_UUID}/oauth-links` && method === "POST") {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       oauthLinks.push(body);
       if (linkStatus !== 200) {

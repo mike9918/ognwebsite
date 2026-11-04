@@ -160,7 +160,8 @@ export function createPanelClient(config: CalagopusConfig): PanelClient {
 
     async linkOauth(userUuid, providerUuid, identifier) {
       try {
-        await request<unknown>(config, "POST", `/api/admin/users/${userUuid}/oauth_links`, {
+        // The route is hyphenated; the source directory (oauth_links) is not.
+        await request<unknown>(config, "POST", `/api/admin/users/${userUuid}/oauth-links`, {
           oauth_provider_uuid: providerUuid,
           identifier,
         });
