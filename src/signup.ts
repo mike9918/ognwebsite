@@ -30,6 +30,8 @@ export type WaitlistRow = {
   discord_dm_consent_at: string | null;
   dm_sent_at: string | null;
   email_sent_at: string | null;
+  discord_channel_id: string | null;
+  discord_message_id: string | null;
 };
 
 export type SignupInput = {

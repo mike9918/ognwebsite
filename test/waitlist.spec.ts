@@ -12,6 +12,7 @@ let sequence = 0;
 let joinStatus = 201;
 let joinCalls = 0;
 let mockScope = "identify email guilds.join";
+let cardMessages: Array<{ content: string; allowed_mentions?: unknown }> = [];
 let mockUser: {
   id: string;
   username: string;
@@ -46,6 +47,12 @@ function installFetchMock(): void {
     if (url === "https://discord.com/api/users/@me") {
       return Response.json(mockUser);
     }
+    if (url === "https://discord.com/api/v10/channels/555000111222333444/messages") {
+      cardMessages.push(
+        JSON.parse(String(init?.body)) as { content: string; allowed_mentions?: unknown },
+      );
+      return Response.json({ id: "card-1" });
+    }
     if (url.startsWith("https://discord.com/api/v10/guilds/123456789012345678/members/")) {
       joinCalls += 1;
       expect(init?.method).toBe("PUT");
@@ -62,6 +69,7 @@ beforeEach(async () => {
   joinStatus = 201;
   joinCalls = 0;
   mockScope = "identify email guilds.join";
+  cardMessages = [];
   mockUser = {
     id: snowflakeForAgeDays(60),
     username: "ada",
@@ -182,6 +190,28 @@ describe("discord sign-up", () => {
     expect(row?.discord_joined_at).toBeTruthy();
     expect(row?.discord_dm_consent_at).toBeTruthy();
     expect(joinCalls).toBe(1);
+  });
+
+  it("posts one waitlist card per person and stores it for the provisioned edit", async () => {
+    await discordSignup({ run_type: "modpack", run_detail: "ATM10" });
+    expect(cardMessages).toHaveLength(1);
+    expect(cardMessages[0].content).toContain("New waitlist entry");
+    expect(cardMessages[0].content).toContain("ada@example.com");
+    expect(cardMessages[0].content).toContain("ATM10");
+    expect(cardMessages[0].content).toContain("3 GB RAM · Modpack");
+    // A handle is never allowed to ping the guild.
+    expect(cardMessages[0].allowed_mentions).toEqual({ parse: [] });
+    const row = await env.DB.prepare(
+      "SELECT discord_channel_id, discord_message_id FROM waitlist",
+    ).first();
+    expect(row).toEqual({
+      discord_channel_id: "555000111222333444",
+      discord_message_id: "card-1",
+    });
+
+    // The same person signing up again is not a new arrival.
+    await discordSignup();
+    expect(cardMessages).toHaveLength(1);
   });
 
   it.each([403, 429, 500])("does not complete signup when Discord join returns %s", async (status) => {

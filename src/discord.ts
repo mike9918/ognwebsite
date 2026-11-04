@@ -1,3 +1,4 @@
+import { postWaitlistCard } from "./board";
 import { content } from "./content";
 import {
   isDiscordAccountOldEnough,
@@ -230,6 +231,9 @@ export async function finishDiscord(
     if (created.row.discord_id !== user.id) return { error: "discord_conflict", cookies: cleared };
     await env.DB.prepare("UPDATE waitlist SET discord_joined_at = ?, discord_dm_consent_at = ? WHERE id = ? AND discord_id = ?")
       .bind(new Date().toISOString(), new Date().toISOString(), created.row.id, user.id).run();
+    // One card per person: a repeat signup returns the existing row and keeps
+    // the message that entry already has.
+    if (!created.existing) await postWaitlistCard(env, env.DB, created.row);
     console.log(
       JSON.stringify({
         event: "waitlist_signup",

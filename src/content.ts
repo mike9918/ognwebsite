@@ -258,6 +258,23 @@ export const content = {
     },
     closing: "Questions? Email support@opengamenode.com or ask in the Discord.",
   },
+  // Staff-facing card in the Discord ops channel. The placeholders are filled
+  // with the entry's place in the queue.
+  board: {
+    heading: "📥 New waitlist entry · place {place}",
+    headingProvisioned: "✅ Provisioned · place {place}",
+    notLinked: "none",
+    labels: {
+      discord: "Discord",
+      email: "Email",
+      plan: "Plan",
+      wants: "Wants",
+      ref: "Ref",
+      joined: "Joined",
+      server: "Server",
+      panelUser: "Panel user",
+    },
+  },
   notFound: {
     title: "That page isn't here.",
     body: "The link may be old, or the page may have moved.",

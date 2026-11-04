@@ -25,6 +25,7 @@ let serverDeployCalls = 0;
 let serverDeployStatus = 200;
 let dmChannelStatus = 200;
 let dmMessages: string[] = [];
+let cardUpdates: string[] = [];
 let emails: Array<Record<string, unknown>> = [];
 let oauthLinks: Array<Record<string, unknown>> = [];
 let linkStatus = 200;
@@ -51,6 +52,15 @@ function installFetchMock(): void {
     if (url === "https://discord.com/api/v10/channels/999000111222333444/messages") {
       dmMessages.push(String(JSON.parse(String(init?.body)).content));
       return Response.json({ id: "msg" });
+    }
+    if (
+      url === "https://discord.com/api/v10/channels/555000111222333444/messages/card-1" &&
+      method === "PATCH"
+    ) {
+      cardUpdates.push(
+        String((JSON.parse(String(init?.body)) as { content: string }).content),
+      );
+      return Response.json({ id: "card-1" });
     }
     if (url === "https://api.resend.com/emails") {
       emails.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
@@ -179,6 +189,7 @@ beforeEach(async () => {
   serverDeployStatus = 200;
   dmChannelStatus = 200;
   dmMessages = [];
+  cardUpdates = [];
   emails = [];
   oauthLinks = [];
   linkStatus = 200;
@@ -412,5 +423,24 @@ describe("provisioning", () => {
     expect(createdUsers).toHaveLength(1);
     expect(oauthLinks).toHaveLength(2);
     expect(serverDeployCalls).toBe(1);
+  });
+
+  it("marks the waitlist card as provisioned instead of posting another", async () => {
+    const id = await insertEntry("vanilla");
+    await env.DB.prepare(
+      "UPDATE waitlist SET discord_channel_id = ?, discord_message_id = ? WHERE id = ?",
+    )
+      .bind("555000111222333444", "card-1", id)
+      .run();
+
+    const response = await provision(id, await adminCookie());
+    expect(response.headers.get("Location")).toBe("/admin?provisioned=1");
+    expect(cardUpdates).toHaveLength(1);
+    expect(cardUpdates[0]).toContain("✅ Provisioned");
+    expect(cardUpdates[0]).toContain("ada server");
+    expect(cardUpdates[0]).toContain("ada_ab12cd34");
+    expect(cardUpdates[0]).toContain(`/server/${SERVER_UUID}`);
+    // The card still carries the entry's original details.
+    expect(cardUpdates[0]).toContain("ada@example.com");
   });
 });

@@ -12,6 +12,9 @@ interface Env {
   CALAGOPUS_NODE_UUID?: string;
   CALAGOPUS_LOCATION_UUIDS?: string;
   EMAIL_FROM?: string;
+  // Optional: channel for the "new waitlist entry" card. Without it the bot
+  // looks up a text channel named "waitlist" in the guild, once per isolate.
+  DISCORD_WAITLIST_CHANNEL_ID?: string;
   CALAGOPUS_API_KEY?: string;
   // Microsoft 365 / Exchange Online app-only sending (preferred).
   MS_GRAPH_TENANT_ID?: string;

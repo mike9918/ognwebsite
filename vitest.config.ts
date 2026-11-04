@@ -19,6 +19,7 @@ export default defineConfig(async () => ({
           DISCORD_CLIENT_SECRET: "discord-secret",
           DISCORD_BOT_TOKEN: "test-bot-token",
           DISCORD_GUILD_ID: "123456789012345678",
+          DISCORD_WAITLIST_CHANNEL_ID: "555000111222333444",
           DISCORD_INVITE_URL: "https://discord.gg/example",
           PUBLIC_ORIGIN: "https://opengamenode.com",
           CALAGOPUS_URL: "https://panel.test",

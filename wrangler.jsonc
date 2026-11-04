@@ -47,8 +47,10 @@
     // it to stop linking and fall back to email sign-in wording.
     // CALAGOPUS_URL, CALAGOPUS_NEST_UUID, CALAGOPUS_EGG_*,
     // CALAGOPUS_NODE_UUID / CALAGOPUS_LOCATION_UUIDS and EMAIL_FROM are set in
-    // the dashboard (locally in .dev.vars). Secrets: CALAGOPUS_API_KEY and
-    // MS_GRAPH_* / RESEND_API_KEY, via `npx wrangler secret put <NAME>`.
+    // the dashboard (locally in .dev.vars). DISCORD_WAITLIST_CHANNEL_ID is
+    // optional: without it the bot posts the entry card to the guild's
+    // "waitlist" channel. Secrets: CALAGOPUS_API_KEY and MS_GRAPH_* /
+    // RESEND_API_KEY, via `npx wrangler secret put <NAME>`.
     "CALAGOPUS_DISCORD_PROVIDER_UUID": "609712d4-1d05-45ad-8ad9-eea05c78941a"
   },
   "secrets": {

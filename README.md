@@ -106,6 +106,20 @@ is sent as `true`: Minecraft eggs default it to `false`, which leaves the instal
 and the first start refusing to run until someone accepts it by hand and
 reinstalls. Every other variable keeps the egg's own default value.
 
+### Waitlist card
+
+Every completed Discord signup posts one card to the server's `waitlist` channel
+(handle, email, plan, want, referral code, place in the queue). Provisioning
+edits that same message in place: the heading turns into `✅ Provisioned` and the
+server, panel user and server URL are added. Channel and message ids are stored
+on the row, so a retry edits the existing card instead of posting a second one.
+
+`DISCORD_WAITLIST_CHANNEL_ID` pins the channel; without it the bot looks up a
+text channel named `waitlist` (or `wait-list`) in `DISCORD_GUILD_ID`, once per
+isolate. The card is best effort: a Discord failure is logged and the signup or
+provision still succeeds. The bot needs Send Messages in that channel; no role
+ping is used, and visitor-supplied text can't mention anyone.
+
 Production `TURNSTILE_HOSTNAMES` is `opengamenode.com,www.opengamenode.com`.
 
 Discord OAuth scopes:

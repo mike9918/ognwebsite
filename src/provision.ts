@@ -1,3 +1,4 @@
+import { updateWaitlistCard } from "./board";
 import {
   CalagopusError,
   createPanelClient,
@@ -434,6 +435,14 @@ export async function provisionEntry(
 
     step = "notification";
     await notify(env, env.DB, row, server, config, now);
+
+    // Editing the arrival card turns the ops channel into the queue's status
+    // board. It never throws, so a Discord hiccup cannot fail a provision.
+    await updateWaitlistCard(env, env.DB, row, {
+      serverName: server.name,
+      panelUser: panelUsername(row),
+      serverUrl: `${config.baseUrl}/server/${server.uuid}`,
+    });
 
     const doneAt = now.toISOString();
     await env.DB.prepare(
