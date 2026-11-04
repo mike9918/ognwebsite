@@ -154,7 +154,10 @@ export async function finishDiscord(
     const tokenJson = (await tokenResponse.json()) as { access_token?: string; scope?: string };
     const accessToken = tokenJson.access_token ?? "";
     if (!accessToken) return { error: "discord", cookies: cleared };
-    if (!tokenJson.scope?.split(" ").includes("guilds.join")) return { error: "discord_join", cookies: cleared };
+    if (!tokenJson.scope?.split(" ").includes("guilds.join")) {
+      console.error(JSON.stringify({ event: "discord_join_failed", reason: "missing_scope" }));
+      return { error: "discord_join", cookies: cleared };
+    }
     const userResponse = await fetch("https://discord.com/api/users/@me", {
       headers: { Authorization: `Bearer ${accessToken}` },
       signal: AbortSignal.timeout(10_000),
@@ -195,9 +198,22 @@ export async function finishDiscord(
         body: JSON.stringify({ access_token: accessToken }),
         signal: AbortSignal.timeout(10_000),
       });
-    } catch { return { error: "discord_join", cookies: cleared }; }
+    } catch {
+      console.error(JSON.stringify({ event: "discord_join_failed", reason: "network_or_timeout" }));
+      return { error: "discord_join", cookies: cleared };
+    }
     // 204 means already a member; do not try to parse its empty response.
-    if (joined.status !== 201 && joined.status !== 204) return { error: "discord_join", cookies: cleared };
+    if (joined.status !== 201 && joined.status !== 204) {
+      // Only retain numeric diagnostics: Discord response bodies can contain
+      // sensitive data, so never log the request, token or full response.
+      let discordCode: number | null = null;
+      try {
+        const body = await joined.json() as { code?: unknown };
+        if (typeof body.code === "number") discordCode = body.code;
+      } catch { /* Non-JSON upstream errors still have an HTTP status. */ }
+      console.error(JSON.stringify({ event: "discord_join_failed", reason: "api", status: joined.status, discordCode }));
+      return { error: "discord_join", cookies: cleared };
+    }
     const created = await createSignup(env.DB, {
       email,
       discordId: user.id,
