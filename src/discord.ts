@@ -232,8 +232,9 @@ export async function finishDiscord(
     await env.DB.prepare("UPDATE waitlist SET discord_joined_at = ?, discord_dm_consent_at = ? WHERE id = ? AND discord_id = ?")
       .bind(new Date().toISOString(), new Date().toISOString(), created.row.id, user.id).run();
     // One card per person: a repeat signup returns the existing row and keeps
-    // the message that entry already has.
-    if (!created.existing) await postWaitlistCard(env, env.DB, created.row);
+    // the message that entry already has. A row with no card yet (created
+    // before this feature, or deleted in Discord) gets one on the next signup.
+    if (!created.row.discord_message_id) await postWaitlistCard(env, env.DB, created.row);
     console.log(
       JSON.stringify({
         event: "waitlist_signup",

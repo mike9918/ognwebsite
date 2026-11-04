@@ -42,22 +42,43 @@ async function resolveChannel(env: Env): Promise<string | null> {
       headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}` },
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn(
+        JSON.stringify({ event: "waitlist_card_skipped", reason: "lookup_http", status: response.status }),
+      );
+      return null;
+    }
     const channels = (await response.json()) as Array<{
       id?: string;
       name?: string;
       type?: number;
     }>;
-    const match = channels.find(
-      (channel) =>
+    // Text and announcement channels only; a voice channel named "waitlist"
+    // cannot take a message. An exact name wins, then the first channel that
+    // mentions it, so "waitlist-signups" also works without extra settings.
+    const text = channels.filter(
+      (channel): channel is { id: string; name: string } =>
         typeof channel.id === "string" &&
         typeof channel.name === "string" &&
-        // Text and announcement channels only; a voice channel named "waitlist"
-        // cannot take a message.
-        (channel.type === 0 || channel.type === 5) &&
-        channelName(channel.name) === "waitlist",
+        (channel.type === 0 || channel.type === 5),
     );
-    if (!match?.id) return null;
+    const name = (channel: { name: string }) => channelName(channel.name);
+    const match =
+      text.find((channel) => name(channel) === "waitlist") ??
+      text.find((channel) => name(channel).includes("waitlist"));
+    if (!match?.id) {
+      // Channel names are not sensitive, and they say whether the bot can even
+      // see the guild's channels.
+      console.warn(
+        JSON.stringify({
+          event: "waitlist_card_skipped",
+          reason: "channel_missing",
+          guild,
+          seen: text.map((channel) => channel.name).slice(0, 25),
+        }),
+      );
+      return null;
+    }
     channelCache = { guild, id: match.id };
     return match.id;
   } catch {
@@ -121,10 +142,7 @@ export async function postWaitlistCard(
   if (!botConfigured(env)) return;
   try {
     const channelId = await resolveChannel(env);
-    if (!channelId) {
-      console.warn(JSON.stringify({ event: "waitlist_card_skipped", reason: "channel_missing" }));
-      return;
-    }
+    if (!channelId) return;
     const position = await positionFor(db, row);
     const response = await fetch(`${API}/channels/${channelId}/messages`, {
       method: "POST",
@@ -138,7 +156,12 @@ export async function postWaitlistCard(
     });
     if (!response.ok) {
       console.warn(
-        JSON.stringify({ event: "waitlist_card_skipped", reason: `http_${response.status}` }),
+        JSON.stringify({
+          event: "waitlist_card_skipped",
+          reason: "send_http",
+          status: response.status,
+          channel: channelId,
+        }),
       );
       return;
     }
