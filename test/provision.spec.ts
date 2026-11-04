@@ -1,6 +1,8 @@
 import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { panelNames } from "../src/provision";
+import type { WaitlistRow } from "../src/signup";
 
 type TestEnv = Env & { TEST_MIGRATIONS: D1Migration[] };
 
@@ -166,6 +168,14 @@ afterEach(() => {
 });
 
 describe("provisioning", () => {
+  it("splits a Discord handle into names, never leaving the surname empty", () => {
+    const names = (value: string) => panelNames({ discord_username: value } as WaitlistRow);
+    expect(names("Ada Lovelace")).toEqual({ first: "Ada", last: "Lovelace" });
+    expect(names("ada")).toEqual({ first: "ada", last: "ada" });
+    expect(names("")).toEqual({ first: "Player", last: "Player" });
+    expect(names("   ")).toEqual({ first: "Player", last: "Player" });
+  });
+
   it("requires an admin session", async () => {
     const id = await insertEntry();
     const response = await provision(id);
@@ -184,6 +194,9 @@ describe("provisioning", () => {
       external_id: `ogn-${id}`,
       email: "ada@example.com",
       username: "ada_ab12cd34",
+      name_first: "ada",
+      // Calagopus rejects an empty surname with HTTP 400, so it is never blank.
+      name_last: "ada",
       admin: false,
       send_email: true,
     });

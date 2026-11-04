@@ -93,6 +93,18 @@ export function panelUsername(row: WaitlistRow): string {
   return `${base || "player"}_${suffix}`.slice(0, 15);
 }
 
+// Calagopus requires a non-empty last name, but Discord gives us a single
+// handle and often no surname at all. Split "ada lovelace" into its parts; a
+// one-word handle fills both fields so the panel stays valid without inventing
+// a name. Sending an empty name_last is a 400 from POST /api/admin/users.
+export function panelNames(row: WaitlistRow): { first: string; last: string } {
+  const raw = (row.discord_username ?? "").replace(/[\u0000-\u001f\u007f]/g, " ");
+  const words = raw.split(/\s+/).filter(Boolean);
+  const first = cleanText(words[0] ?? "", 32) || "Player";
+  const last = cleanText(words.slice(1).join(" "), 32) || first;
+  return { first, last };
+}
+
 export function panelServerName(row: WaitlistRow): string {
   const base = (row.discord_username ?? "")
     .replace(/[^A-Za-z0-9 _.-]/g, "")
@@ -185,13 +197,14 @@ async function ensurePanelUser(
     return existing;
   }
 
+  const names = panelNames(row);
   try {
     const created = await client.createUser({
       external_id: externalId,
       username: panelUsername(row),
       email: row.email,
-      name_first: cleanText(row.discord_username ?? "", 32) || "Player",
-      name_last: "",
+      name_first: names.first,
+      name_last: names.last,
       admin: false,
       // The panel sends its own account email; ours is the "server is ready"
       // notice, so the two never duplicate the same message.
