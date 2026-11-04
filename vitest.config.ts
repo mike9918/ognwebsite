@@ -29,6 +29,7 @@ export default defineConfig(async () => ({
           CALAGOPUS_EGG_MODPACK: "22222222-2222-4222-8222-222222222222",
           CALAGOPUS_NODE_UUID: "",
           CALAGOPUS_LOCATION_UUIDS: "66666666-6666-4666-8666-666666666666",
+          CALAGOPUS_DISCORD_PROVIDER_UUID: "88888888-8888-4888-8888-888888888888",
           RESEND_API_KEY: "test-resend-key",
           EMAIL_FROM: "OpenGameNode <hello@opengamenode.com>",
         },

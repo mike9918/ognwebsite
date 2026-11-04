@@ -22,6 +22,9 @@ export type ProvisionConfig = {
   eggs: Partial<Record<RunType, string>>;
   nodeUuid: string | null;
   locationUuids: string[];
+  // The panel's Discord OAuth provider. When set, every provisioned user is
+  // linked to their Discord id so their first sign-in lands in that account.
+  discordProviderUuid: string | null;
   panelUrl: string;
 };
 
@@ -70,6 +73,8 @@ export function provisionConfig(env: Env): ProvisionConfig | null {
     .map((value) => value.trim())
     .filter((value) => UUID.test(value));
 
+  const discordProviderUuid = (env.CALAGOPUS_DISCORD_PROVIDER_UUID ?? "").trim();
+
   return {
     baseUrl,
     apiKey,
@@ -77,6 +82,7 @@ export function provisionConfig(env: Env): ProvisionConfig | null {
     eggs,
     nodeUuid: UUID.test(nodeUuid) ? nodeUuid : null,
     locationUuids,
+    discordProviderUuid: UUID.test(discordProviderUuid) ? discordProviderUuid : null,
     panelUrl: content.panelUrl,
   };
 }
@@ -315,6 +321,8 @@ async function notify(
     plan: planFor(row.run_type),
     panelUrl: config.panelUrl,
     serverUrl: `${config.baseUrl}/server/${server.uuid}`,
+    panelSignIn:
+      config.discordProviderUuid && row.discord_id ? ("discord" as const) : ("email" as const),
   };
 
   let dmSent = Boolean(row.dm_sent_at);
@@ -392,6 +400,15 @@ export async function provisionEntry(
   try {
     const client = createPanelClient(config);
     const user = await ensurePanelUser(env.DB, client, row);
+
+    // A Discord sign-in with no existing link either creates a second panel
+    // account or fails with user_already_exists, so the link has to exist
+    // before the user ever visits the panel. Required when a provider is
+    // configured: a DM promising Discord sign-in must not be a lie.
+    step = "panel_link";
+    if (config.discordProviderUuid && row.discord_id) {
+      await client.linkOauth(user.uuid, config.discordProviderUuid, row.discord_id);
+    }
 
     step = "server";
     const server = await ensureServer(env.DB, client, row, config, user.uuid);

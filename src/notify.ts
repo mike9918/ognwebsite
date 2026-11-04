@@ -14,6 +14,10 @@ export type ReadyNotice = {
   plan: ServerPlan;
   panelUrl: string;
   serverUrl: string;
+  // "discord" only when the panel account is already linked to their Discord
+  // id, so promising a Discord sign-in can never bounce them to
+  // user_already_exists.
+  panelSignIn: "discord" | "email";
 };
 
 function fill(template: string, values: Record<string, string>): string {
@@ -25,19 +29,31 @@ export function notifyConfigured(env: Env): boolean {
   return discord || emailConfigured(env);
 }
 
+function dmSignIn(notice: ReadyNotice): string {
+  return notice.panelSignIn === "discord"
+    ? fill(content.provision.dmNoteDiscord, { panel: notice.panelUrl })
+    : fill(content.provision.dmNote, { email: notice.email });
+}
+
+function emailSignIn(notice: ReadyNotice): string {
+  return notice.panelSignIn === "discord"
+    ? fill(content.provision.emailNoteDiscord, { panel: notice.panelUrl })
+    : fill(content.provision.emailNote, { email: notice.email });
+}
+
 export function dmMessage(notice: ReadyNotice): string {
-  const { labels, dmIntro, dmNote } = content.provision;
+  const { labels, dmIntro } = content.provision;
   return [
     dmIntro,
     `${labels.server}: ${notice.serverName}`,
     `${labels.plan}: ${describePlan(notice.plan)}`,
-    fill(dmNote, { email: notice.email }),
+    dmSignIn(notice),
     notice.panelUrl,
   ].join("\n");
 }
 
 function emailText(notice: ReadyNotice): string {
-  const { labels, emailIntro, emailNote, closing } = content.provision;
+  const { labels, emailIntro, closing } = content.provision;
   return [
     emailIntro,
     "",
@@ -46,7 +62,7 @@ function emailText(notice: ReadyNotice): string {
     `${labels.panel}: ${notice.panelUrl}`,
     `${labels.email}: ${notice.email}`,
     "",
-    fill(emailNote, { email: notice.email }),
+    emailSignIn(notice),
     notice.serverUrl,
     "",
     closing,
@@ -54,7 +70,7 @@ function emailText(notice: ReadyNotice): string {
 }
 
 function emailHtml(notice: ReadyNotice): string {
-  const { labels, emailIntro, emailNote, closing } = content.provision;
+  const { labels, emailIntro, closing } = content.provision;
   const rows: Array<[string, string]> = [
     [labels.server, notice.serverName],
     [labels.plan, describePlan(notice.plan)],
@@ -73,7 +89,7 @@ function emailHtml(notice: ReadyNotice): string {
       <h1 style="margin:0 0 12px;font-size:20px">${escapeHtml(emailIntro)}</h1>
       <table role="presentation" style="font-size:14px;line-height:1.6">${cells}</table>
       <p style="margin:20px 0"><a href="${escapeHtml(notice.panelUrl)}" style="background:#0d1712;color:#ffffff;padding:10px 18px;border-radius:999px;text-decoration:none">Open the panel</a></p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.6">${escapeHtml(fill(emailNote, { email: notice.email }))}</p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.6">${escapeHtml(emailSignIn(notice))}</p>
       <p style="margin:0 0 16px;font-size:14px;line-height:1.6"><a href="${escapeHtml(notice.serverUrl)}">${escapeHtml(notice.serverUrl)}</a></p>
       <p style="margin:0;font-size:12px;line-height:1.6;color:#5b6b62">${escapeHtml(closing)}</p>
     </td></tr>

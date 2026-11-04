@@ -242,10 +242,14 @@ export const content = {
   provision: {
     dmIntro: "Your OpenGameNode server is ready.",
     dmNote: "Sign in with {email} and press Start when you want to play.",
+    dmNoteDiscord:
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to set up. Press Start when you want to play.",
     emailSubject: "Your OpenGameNode server is ready",
     emailIntro: "Your server is ready.",
     emailNote:
       "Sign in with {email}. If you don't have a panel password yet, use “Forgot password” on the panel sign-in page.",
+    emailNoteDiscord:
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to remember. If you'd rather use an email password, choose “Forgot password”.",
     labels: {
       server: "Server",
       plan: "Plan",

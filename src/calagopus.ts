@@ -111,6 +111,7 @@ export type PanelClient = {
   createUser(input: Record<string, unknown>): Promise<CalagopusUser>;
   searchUsers(search: string): Promise<CalagopusUser[]>;
   linkExternalId(userUuid: string, externalId: string): Promise<void>;
+  linkOauth(userUuid: string, providerUuid: string, identifier: string): Promise<void>;
   getServerByExternalId(externalId: string): Promise<CalagopusServer | null>;
   getEgg(nestUuid: string, eggUuid: string): Promise<CalagopusEgg>;
   getEggVariables(nestUuid: string, eggUuid: string): Promise<CalagopusEggVariable[]>;
@@ -155,6 +156,19 @@ export function createPanelClient(config: CalagopusConfig): PanelClient {
       await request<unknown>(config, "PATCH", `/api/admin/users/${userUuid}`, {
         external_id: externalId,
       });
+    },
+
+    async linkOauth(userUuid, providerUuid, identifier) {
+      try {
+        await request<unknown>(config, "POST", `/api/admin/users/${userUuid}/oauth_links`, {
+          oauth_provider_uuid: providerUuid,
+          identifier,
+        });
+      } catch (error) {
+        // Already linked is the end state we want, so a duplicate is success.
+        if (error instanceof CalagopusError && error.status === 409) return;
+        throw error;
+      }
     },
 
     async getServerByExternalId(externalId) {

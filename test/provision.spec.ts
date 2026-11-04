@@ -13,6 +13,7 @@ const EGG_VANILLA = "33333333-3333-4333-8333-333333333333";
 const USER_UUID = "44444444-4444-4444-8444-444444444444";
 const SERVER_UUID = "55555555-5555-4555-8555-555555555555";
 const DISCORD_ID = "333444555666777888";
+const DISCORD_PROVIDER = "88888888-8888-4888-8888-888888888888";
 
 const originalFetch = globalThis.fetch;
 
@@ -25,6 +26,8 @@ let serverDeployStatus = 200;
 let dmChannelStatus = 200;
 let dmMessages: string[] = [];
 let emails: Array<Record<string, unknown>> = [];
+let oauthLinks: Array<Record<string, unknown>> = [];
+let linkStatus = 200;
 
 function installFetchMock(): void {
   globalThis.fetch = async (input, init) => {
@@ -62,6 +65,14 @@ function installFetchMock(): void {
       createdUsers.push(body);
       panelUser = { uuid: USER_UUID, email: String(body.email), external_id: String(body.external_id) };
       return Response.json({ user: panelUser });
+    }
+    if (url === `${PANEL}/api/admin/users/${USER_UUID}/oauth_links` && method === "POST") {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      oauthLinks.push(body);
+      if (linkStatus !== 200) {
+        return Response.json({ errors: [{ detail: "link failed" }] }, { status: linkStatus });
+      }
+      return Response.json({ oauth_link: { identifier: body.identifier } });
     }
     const eggPath = `${PANEL}/api/admin/nests/${NEST}/eggs/`;
     if (url.startsWith(eggPath)) {
@@ -155,6 +166,8 @@ beforeEach(async () => {
   dmChannelStatus = 200;
   dmMessages = [];
   emails = [];
+  oauthLinks = [];
+  linkStatus = 200;
   installFetchMock();
   await applyD1Migrations(env.DB, (env as TestEnv).TEST_MIGRATIONS);
   await env.DB.batch([
@@ -200,6 +213,11 @@ describe("provisioning", () => {
       admin: false,
       send_email: true,
     });
+    // The panel only signs someone into this account if the Discord link
+    // exists before their first sign-in.
+    expect(oauthLinks).toEqual([
+      { oauth_provider_uuid: DISCORD_PROVIDER, identifier: DISCORD_ID },
+    ]);
 
     expect(createdServers).toHaveLength(1);
     const server = createdServers[0] as {
@@ -228,7 +246,7 @@ describe("provisioning", () => {
     expect(dmMessages).toHaveLength(1);
     expect(dmMessages[0]).toContain("ada server");
     expect(dmMessages[0]).toContain("3 GB RAM · Modpack");
-    expect(dmMessages[0]).toContain("ada@example.com");
+    expect(dmMessages[0]).toContain("Sign in at https://panel.opengamenode.com with Discord");
 
     expect(emails).toHaveLength(1);
     expect(emails[0]).toMatchObject({
@@ -319,5 +337,40 @@ describe("provisioning", () => {
       .first<Record<string, string | null>>();
     expect(row?.dm_sent_at).toBeNull();
     expect(row?.email_sent_at).toBeTruthy();
+  });
+
+  it("treats an existing Discord link as success", async () => {
+    const id = await insertEntry("vanilla");
+    linkStatus = 409;
+    const response = await provision(id, await adminCookie());
+    expect(response.headers.get("Location")).toBe("/admin?provisioned=1");
+    expect(createdServers).toHaveLength(1);
+  });
+
+  it("stops before creating a server when the panel refuses the Discord link", async () => {
+    const id = await insertEntry("vanilla");
+    const cookie = await adminCookie();
+    linkStatus = 403;
+
+    const failed = await provision(id, cookie);
+    expect(failed.headers.get("Location")).toBe("/admin?provision=failed");
+    expect(serverDeployCalls).toBe(0);
+
+    const row = await env.DB.prepare(
+      "SELECT provision_state, provision_error, calagopus_user_uuid FROM waitlist WHERE id = ?",
+    )
+      .bind(id)
+      .first<Record<string, string | null>>();
+    expect(row?.provision_state).toBe("failed");
+    expect(row?.provision_error).toContain("HTTP 403");
+    expect(row?.calagopus_user_uuid).toBe(USER_UUID);
+
+    // Fixing the panel permissions and retrying resumes at the link step.
+    linkStatus = 200;
+    const retried = await provision(id, cookie);
+    expect(retried.headers.get("Location")).toBe("/admin?provisioned=1");
+    expect(createdUsers).toHaveLength(1);
+    expect(oauthLinks).toHaveLength(2);
+    expect(serverDeployCalls).toBe(1);
   });
 });

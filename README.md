@@ -73,6 +73,25 @@ config file. The API keys are secrets, are stored separately from vars, and are
 deliberately not in `secrets.required`, so a deploy still works before the panel
 and email account exist.
 
+### Discord sign-in
+
+Provisioned users sign in to the panel with Discord, so the waitlist identity and
+the panel account stay the same person. The panel only does that when the link
+already exists: a Discord sign-in with no link either creates a second account or
+stops with `user_already_exists` when the Discord email matches ours.
+
+- Panel → Admin → OAuth Providers → Discord: enable it, allow login, and turn on
+  **API linkable**. That switch is what lets an API key create links.
+- `CALAGOPUS_DISCORD_PROVIDER_UUID` in `wrangler.jsonc` is that provider's UUID
+  (the provider page shows it, and `GET /api/auth/oauth` lists it publicly).
+- The API key needs `users.oauth-links` and `users.impersonate` as well.
+
+Provisioning links `waitlist.discord_id` to the new panel user before it creates
+the server, and a retry re-runs only that step. While the provider UUID is set, a
+rejected link fails the provision instead of sending a message that promises a
+sign-in that would not work; clear that error by fixing the panel permissions.
+Without the UUID, the DM and email ask the user to sign in by email instead.
+
 Production `TURNSTILE_HOSTNAMES` is `opengamenode.com,www.opengamenode.com`.
 
 Discord OAuth scopes:

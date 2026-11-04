@@ -40,11 +40,16 @@
   // survive a deploy. Secrets are stored separately and are always kept.
   "keep_vars": true,
   "vars": {
-    "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30"
+    "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30",
+    // The panel's Discord OAuth provider UUID, from Admin -> OAuth Providers
+    // (also listed by GET /api/auth/oauth). Provisioning links each panel user
+    // to their Discord id so their first sign-in lands in that account. Remove
+    // it to stop linking and fall back to email sign-in wording.
     // CALAGOPUS_URL, CALAGOPUS_NEST_UUID, CALAGOPUS_EGG_*,
     // CALAGOPUS_NODE_UUID / CALAGOPUS_LOCATION_UUIDS and EMAIL_FROM are set in
     // the dashboard (locally in .dev.vars). Secrets: CALAGOPUS_API_KEY and
     // MS_GRAPH_* / RESEND_API_KEY, via `npx wrangler secret put <NAME>`.
+    "CALAGOPUS_DISCORD_PROVIDER_UUID": "609712d4-1d05-45ad-8ad9-eea05c78941a"
   },
   "secrets": {
     "required": [
