@@ -122,6 +122,23 @@ export type PanelClient = {
 };
 
 export function createPanelClient(config: CalagopusConfig): PanelClient {
+  // Which panel user owns a Discord identity. A 404 means nobody does; a 403
+  // means the key cannot look (oauth-providers.read), which is reported as
+  // unknown rather than as "free".
+  async function oauthOwner(providerUuid: string, identifier: string): Promise<string | null> {
+    try {
+      const body = await request<{ user_oauth_link?: { user?: { uuid?: string } } }>(
+        config,
+        "GET",
+        `/api/admin/oauth-providers/${providerUuid}/users/identifier/${encodeURIComponent(identifier)}`,
+      );
+      return body.user_oauth_link?.user?.uuid ?? null;
+    } catch (error) {
+      if (error instanceof CalagopusError && (error.status === 404 || error.status === 403)) return null;
+      throw error;
+    }
+  }
+
   return {
     async findUserByExternalId(externalId) {
       try {
@@ -166,9 +183,17 @@ export function createPanelClient(config: CalagopusConfig): PanelClient {
           identifier,
         });
       } catch (error) {
-        // Already linked is the end state we want, so a duplicate is success.
-        if (error instanceof CalagopusError && error.status === 409) return;
-        throw error;
+        if (!(error instanceof CalagopusError) || error.status !== 409) throw error;
+        // 409 means that Discord identity belongs to some panel user. That is
+        // only success when it is ours; if it is another account the person
+        // would sign in as someone else, so stop and say so.
+        const owner = await oauthOwner(providerUuid, identifier);
+        if (owner === userUuid) return;
+        throw new Error(
+          owner
+            ? `That Discord account is already linked to a different panel account (${owner}). Unlink it in the panel, then retry.`
+            : "Calagopus reports that Discord account as already linked, but the owning panel account could not be read. Link it by hand in the panel, then retry.",
+        );
       }
     },
 

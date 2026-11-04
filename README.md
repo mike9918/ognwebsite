@@ -87,8 +87,10 @@ stops with `user_already_exists` when the Discord email matches ours.
   `await fetch('/api/admin/oauth-providers/<provider>', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_linkable: true }) }).then(r => r.status)`
 - `CALAGOPUS_DISCORD_PROVIDER_UUID` in `wrangler.jsonc` is that provider's UUID
   (the provider page shows it, and `GET /api/auth/oauth` lists it publicly).
-- The API key needs `users.oauth-links` and `users.impersonate` as well. Without
-  either, the panel answers 403 and the row says which two things to turn on.
+- The API key needs `users.oauth-links`, `users.impersonate` and
+  `oauth-providers.read`. Without the first two the panel answers 403 and the row
+  names them; the read permission lets a duplicate-link conflict be checked
+  against the real owner instead of trusting the panel's 409.
 
 Provisioning links `waitlist.discord_id` to the new panel user before it creates
 the server, and a retry re-runs only that step. While the provider UUID is set, a

@@ -28,6 +28,7 @@ let dmMessages: string[] = [];
 let emails: Array<Record<string, unknown>> = [];
 let oauthLinks: Array<Record<string, unknown>> = [];
 let linkStatus = 200;
+let linkOwner: string | null = USER_UUID;
 
 function installFetchMock(): void {
   globalThis.fetch = async (input, init) => {
@@ -65,6 +66,18 @@ function installFetchMock(): void {
       createdUsers.push(body);
       panelUser = { uuid: USER_UUID, email: String(body.email), external_id: String(body.external_id) };
       return Response.json({ user: panelUser });
+    }
+    if (
+      url ===
+        `${PANEL}/api/admin/oauth-providers/${DISCORD_PROVIDER}/users/identifier/${DISCORD_ID}` &&
+      method === "GET"
+    ) {
+      if (!linkOwner) {
+        return Response.json({ errors: [{ detail: "Not found" }] }, { status: 404 });
+      }
+      return Response.json({
+        user_oauth_link: { uuid: "link", user: { uuid: linkOwner }, identifier: DISCORD_ID },
+      });
     }
     if (url === `${PANEL}/api/admin/users/${USER_UUID}/oauth-links` && method === "POST") {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -168,6 +181,7 @@ beforeEach(async () => {
   emails = [];
   oauthLinks = [];
   linkStatus = 200;
+  linkOwner = USER_UUID;
   installFetchMock();
   await applyD1Migrations(env.DB, (env as TestEnv).TEST_MIGRATIONS);
   await env.DB.batch([
@@ -345,6 +359,25 @@ describe("provisioning", () => {
     const response = await provision(id, await adminCookie());
     expect(response.headers.get("Location")).toBe("/admin?provisioned=1");
     expect(createdServers).toHaveLength(1);
+  });
+
+  it("refuses a Discord identity that another panel account already owns", async () => {
+    const id = await insertEntry("vanilla");
+    linkStatus = 409;
+    linkOwner = "99999999-9999-4999-8999-999999999999";
+
+    const response = await provision(id, await adminCookie());
+    expect(response.headers.get("Location")).toBe("/admin?provision=failed");
+    expect(serverDeployCalls).toBe(0);
+
+    const row = await env.DB.prepare(
+      "SELECT provision_state, provision_error FROM waitlist WHERE id = ?",
+    )
+      .bind(id)
+      .first<Record<string, string | null>>();
+    expect(row?.provision_state).toBe("failed");
+    expect(row?.provision_error).toContain("already linked to a different panel account");
+    expect(row?.provision_error).toContain(linkOwner);
   });
 
   it("stops before creating a server when the panel refuses the Discord link", async () => {
