@@ -1,6 +1,6 @@
 import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { snowflakeForAgeDays } from "../src/discord-age";
 import { discordConfigured, readPendingSignup } from "../src/discord";
 import { signPayload } from "../src/signed";
@@ -80,6 +80,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   globalThis.fetch = originalFetch;
 });
 
@@ -156,6 +157,16 @@ describe("pages", () => {
 });
 
 describe("discord sign-up", () => {
+  it("logs numeric join diagnostics without credentials or user information", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    joinStatus = 403;
+    await finishDiscord(await startDiscord());
+    expect(logged).toHaveBeenCalledWith(JSON.stringify({ event: "discord_join_failed", reason: "api", status: 403, discordCode: null }));
+    const output = JSON.stringify(logged.mock.calls);
+    expect(output).not.toContain("discord-access");
+    expect(output).not.toContain("test-bot-token");
+    expect(output).not.toContain(mockUser.email);
+  });
   it("requires the bot configuration and rejects expired signed drafts", async () => {
     expect(discordConfigured({ ...env, DISCORD_BOT_TOKEN: "" })).toBe(false);
     expect(discordConfigured({ ...env, DISCORD_GUILD_ID: "not-a-guild" })).toBe(false);
