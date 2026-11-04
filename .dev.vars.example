@@ -25,3 +25,33 @@ DISCORD_INVITE_URL=
 # Empty uses the request origin for referral links (right for local dev).
 # Production: https://opengamenode.com
 PUBLIC_ORIGIN=
+
+# Optional: Calagopus panel provisioning from the admin table. Leave the URL
+# blank to keep the Provision button disabled. UUIDs come from the panel:
+# Admin -> Nests (nest + egg UUIDs), Admin -> Nodes / Locations.
+# In production these are Cloudflare dashboard vars; keep_vars is set so a
+# deploy does not delete them.
+CALAGOPUS_URL=
+# Secret: npx wrangler secret put CALAGOPUS_API_KEY
+CALAGOPUS_API_KEY=
+CALAGOPUS_NEST_UUID=
+CALAGOPUS_EGG_VANILLA=
+CALAGOPUS_EGG_PLUGINS=
+CALAGOPUS_EGG_MODPACK=
+CALAGOPUS_NODE_UUID=
+CALAGOPUS_LOCATION_UUIDS=
+
+# Email for the "server is ready" notice. Microsoft 365 / Exchange Online is
+# used when its app credentials are set; otherwise Resend is used.
+# Graph needs an Entra app registration with the Mail.Send APPLICATION
+# permission and admin consent, restricted to the sender mailbox with an
+# Exchange Application Access Policy. Secrets:
+#   npx wrangler secret put MS_GRAPH_TENANT_ID
+#   npx wrangler secret put MS_GRAPH_CLIENT_ID
+#   npx wrangler secret put MS_GRAPH_CLIENT_SECRET
+MS_GRAPH_TENANT_ID=
+MS_GRAPH_CLIENT_ID=
+MS_GRAPH_CLIENT_SECRET=
+# Standalone fallback. Secret: npx wrangler secret put RESEND_API_KEY
+RESEND_API_KEY=
+EMAIL_FROM=OpenGameNode <hello@opengamenode.com>

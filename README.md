@@ -52,8 +52,26 @@ Set secrets with `npx wrangler secret put <NAME>`. `.dev.vars` supplies them loc
 | `DISCORD_GUILD_ID` | Target OGN server ID |
 | `DISCORD_INVITE_URL` | Shown after sign-up. Empty hides the link |
 | `PUBLIC_ORIGIN` | `https://opengamenode.com` in production. Empty locally |
+| `CALAGOPUS_API_KEY` | Calagopus admin API key, used only for provisioning |
+| `MS_GRAPH_TENANT_ID` | Microsoft 365 tenant for app-only sending |
+| `MS_GRAPH_CLIENT_ID` | Entra app registration client id |
+| `MS_GRAPH_CLIENT_SECRET` | Entra app registration client secret |
+| `RESEND_API_KEY` | Fallback email sender when Microsoft 365 is not configured |
 
 `MIN_DISCORD_ACCOUNT_AGE_DAYS` is a Wrangler var (default `30`). Accounts younger than that cannot join.
+
+Provisioning settings are dashboard vars, not `wrangler.jsonc` vars: `CALAGOPUS_URL`,
+`CALAGOPUS_NEST_UUID`, `CALAGOPUS_EGG_VANILLA`, `CALAGOPUS_EGG_PLUGINS`,
+`CALAGOPUS_EGG_MODPACK`, either `CALAGOPUS_NODE_UUID` or
+`CALAGOPUS_LOCATION_UUIDS` (comma-separated), and `EMAIL_FROM`. A missing or
+invalid value leaves the Provision button disabled. Locally they go in
+`.dev.vars`.
+
+`keep_vars` is set in `wrangler.jsonc` so `wrangler deploy` does not delete the
+dashboard values. Without it, Wrangler removes every variable that is not in the
+config file. The API keys are secrets, are stored separately from vars, and are
+deliberately not in `secrets.required`, so a deploy still works before the panel
+and email account exist.
 
 Production `TURNSTILE_HOSTNAMES` is `opengamenode.com,www.opengamenode.com`.
 
@@ -85,9 +103,81 @@ npm run check
 | `/api/auth/admin/discord` | Admin Discord start |
 | `/api/admin/settings` | Save open/close and cap |
 | `/api/admin/entries/delete` | Delete one waitlist row (admin session) |
+| `/api/admin/entries/provision` | Create the Calagopus account and server, DM and email (admin session) |
 | `/api/admin/export.csv` | CSV export (admin session or bearer token) |
 
 `www.opengamenode.com` redirects to the apex. Custom domains for the apex and `www` are in `wrangler.jsonc`.
+
+## Provisioning
+
+**Provision** on a waitlist row runs the whole onboarding in the Worker, in this
+order: Calagopus account (`external_id` = `ogn-<row id>`, panel email included) →
+server with the plan for that row's `run_type` → Discord DM → email. It is one
+request so the admin sees the result immediately, and it stays resumable: the
+panel UUIDs are written to D1 as soon as they exist, so a retry after a failure
+skips the account and server it already made and only redoes the missing step.
+
+Plans live in `src/plans.ts` (2 GB vanilla and Paper, 3 GB modpack, 10 GB disk,
+1 backup, 1 schedule). Change the numbers there, not in the provisioning code.
+Egg UUIDs and the target node or locations are panel configuration in
+`wrangler.jsonc`. A given run type with no egg configured fails with a clear
+error instead of falling back to the wrong egg.
+
+The DM needs `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID`; membership is rechecked
+before messaging and the row's DM consent is required. If Discord refuses the DM
+(closed DMs, left the guild) the email is the fallback; if a configured email
+sender fails, the row is marked failed and Retry sends only the email. Everything
+is logged as numeric status codes, never tokens, addresses or message bodies.
+
+### Email sender
+
+Microsoft 365 / Exchange Online is used when `MS_GRAPH_TENANT_ID`,
+`MS_GRAPH_CLIENT_ID` and `MS_GRAPH_CLIENT_SECRET` are set; otherwise Resend with
+`RESEND_API_KEY`. The domain is already verified in Microsoft 365, so Graph needs
+no extra sending domain, and the sender must be a real Exchange Online mailbox
+(the P1 mailbox is fine). Do not use SMTP with a mailbox password: Exchange
+Online has retired basic SMTP AUTH.
+
+Set up Graph once:
+
+1. Entra admin center → App registrations → New registration (single tenant).
+2. API permissions → Microsoft Graph → **Application** → `Mail.Send` → Grant admin consent.
+3. Certificates & secrets → new client secret, then `wrangler secret put` the three values.
+4. Scope the app so `Mail.Send` cannot send as every mailbox. Exchange Online now
+   uses RBAC for Applications, which replaces Application Access Policies:
+
+   ```powershell
+   # Object id is the service principal on the app's Overview blade, not the
+   # Application (client) id.
+   New-ServicePrincipal -AppId <client-id> -ObjectId <service-principal-object-id> `
+     -DisplayName "OpenGameNode provisioning"
+
+   New-ManagementScope -Name "OGN provisioning sender" `
+     -RecipientRestrictionFilter "PrimarySmtpAddress -eq 'hello@opengamenode.com'"
+
+   New-ManagementRoleAssignment -App <service-principal-object-id> `
+     -Role "Application Mail.Send" -CustomResourceScope "OGN provisioning sender"
+   ```
+
+   `Get-ManagementRole -RoleType Application` lists the exact role name on your
+   tenant. `Test-ServicePrincipalAuthorization -Identity <service-principal-object-id>
+   -Resource hello@opengamenode.com` shows whether the scope applies. Role changes
+   take 30 minutes to 2 hours to reach a running app.
+5. `EMAIL_FROM` must be an address on that mailbox; the display name is only used by Resend.
+
+Graph takes about an hour-long app-only token, cached per Worker isolate, and sends
+with `saveToSentItems: false` so notifications do not fill the mailbox's Sent Items.
+The provider split lives in `src/email.ts`, so adding another sender is one function.
+
+Why this is not in n8n: the panel account and server are the durable side
+effects, so the code that creates them has to own the claim, the idempotency
+keys (`external_id`) and the per-row state in D1. An n8n webhook would add a
+second source of truth and a hop that cannot tell the admin table what happened.
+n8n is still a fine place for ops alerts or staff-channel notifications later,
+as a fire-and-forget call after the row is `done`.
+
+Before release, apply migration `0004_provisioning.sql` and smoke-test one row
+per run type, a retry after a forced panel failure, and a member with DMs closed.
 
 ## Brand
 

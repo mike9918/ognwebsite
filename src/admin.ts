@@ -155,7 +155,9 @@ export async function listSubmissions(
     db
       .prepare(
         `SELECT id, email, discord_id, discord_username, run_type, run_detail, ref_code, referred_by,
-                referral_count, ip_hash, country, created_at, invited_at, wave
+                referral_count, ip_hash, country, created_at, invited_at, wave,
+                provision_state, provision_error, server_uuid, server_name, provisioned_at,
+                calagopus_user_uuid, discord_dm_consent_at, dm_sent_at, email_sent_at
          FROM waitlist
          ORDER BY created_at DESC, id DESC
          LIMIT ? OFFSET ?`,
@@ -235,6 +237,8 @@ export function adminDashboardPage(options: {
   list: { rows: WaitlistRow[]; total: number; page: number; pageSize: number };
   notice: string | null;
   error: string | null;
+  panelUrl: string;
+  provisioningEnabled: boolean;
 }): string {
   const notice = options.notice ? `<p class="notice" role="status">${escapeHtml(options.notice)}</p>` : "";
   const error = options.error ? `<p class="alert" role="alert">${escapeHtml(options.error)}</p>` : "";
@@ -254,6 +258,26 @@ export function adminDashboardPage(options: {
         options.list.page > 1
           ? `<input type="hidden" name="page" value="${options.list.page}">`
           : "";
+      const state = row.provision_state ?? "";
+      const provisionForm = `<form method="post" action="/api/admin/entries/provision" class="inline-form" data-confirm-provision>
+            <input type="hidden" name="id" value="${row.id}">
+            ${pageField}
+            <button class="button" type="submit">${escapeHtml(
+              state === "failed" ? content.admin.provisionRetry : content.admin.provision,
+            )}</button>
+          </form>`;
+      const provisionAction = !options.provisioningEnabled
+        ? `<button class="button button-secondary" type="button" disabled title="${escapeHtml(content.admin.provisionUnavailable)}">${escapeHtml(content.admin.provision)}</button>`
+        : state === "running"
+          ? `<button class="button button-secondary" type="button" disabled>${escapeHtml(content.admin.provisionRunning)}</button>`
+          : state === "done"
+            ? `<a class="button button-secondary" href="${escapeHtml(`${options.panelUrl}/server/${row.server_uuid ?? ""}`)}">${escapeHtml(content.admin.openServer)}</a>`
+            : provisionForm;
+      const provisionNote = row.provision_error
+        ? `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`
+        : state === "done"
+          ? `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`
+          : "";
       return `<tr>
       <td>${row.id}</td>
       <td>${escapeHtml(row.email)}</td>
@@ -265,7 +289,8 @@ export function adminDashboardPage(options: {
       <td>${escapeHtml(row.created_at)}</td>
       <td>
         <div class="row-actions">
-          <button class="button button-secondary" type="button" disabled title="Panel provisioning is not ready yet">${escapeHtml(content.admin.provision)}</button>
+          ${provisionAction}
+          ${provisionNote}
           <form method="post" action="/api/admin/entries/delete" class="inline-form" data-confirm-delete>
             <input type="hidden" name="id" value="${row.id}">
             ${pageField}
@@ -318,7 +343,7 @@ export function adminDashboardPage(options: {
           </tbody>
         </table>
       </div>
-      <p class="note">Page ${options.list.page} of ${totalPages}. Provision will create a panel account later.</p>
+      <p class="note">Page ${options.list.page} of ${totalPages}. Provision creates the Calagopus account and server, then DMs and emails the user.</p>
       <div class="actions">${prev}${next}</div>
     </section>`,
   );

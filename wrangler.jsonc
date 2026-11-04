@@ -34,8 +34,17 @@
     { "pattern": "opengamenode.com", "custom_domain": true },
     { "pattern": "www.opengamenode.com", "custom_domain": true }
   ],
+  // Without keep_vars, `wrangler deploy` deletes every variable that is not in
+  // this file — including values set in the Cloudflare dashboard. The
+  // provisioning settings live in the dashboard (see README), so they must
+  // survive a deploy. Secrets are stored separately and are always kept.
+  "keep_vars": true,
   "vars": {
     "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30"
+    // CALAGOPUS_URL, CALAGOPUS_NEST_UUID, CALAGOPUS_EGG_*,
+    // CALAGOPUS_NODE_UUID / CALAGOPUS_LOCATION_UUIDS and EMAIL_FROM are set in
+    // the dashboard (locally in .dev.vars). Secrets: CALAGOPUS_API_KEY and
+    // MS_GRAPH_* / RESEND_API_KEY, via `npx wrangler secret put <NAME>`.
   },
   "secrets": {
     "required": [

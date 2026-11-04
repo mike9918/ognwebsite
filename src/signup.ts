@@ -21,6 +21,15 @@ export type WaitlistRow = {
   created_at: string;
   invited_at: string | null;
   wave: number | null;
+  provision_state: string | null;
+  provision_error: string | null;
+  server_uuid: string | null;
+  server_name: string | null;
+  provisioned_at: string | null;
+  calagopus_user_uuid: string | null;
+  discord_dm_consent_at: string | null;
+  dm_sent_at: string | null;
+  email_sent_at: string | null;
 };
 
 export type SignupInput = {

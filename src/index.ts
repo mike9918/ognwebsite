@@ -41,6 +41,7 @@ import { findByRef, normalizeRef, toPublic } from "./signup";
 import { signupBlockedReason } from "./settings";
 import { findGuide } from "./guides";
 import { aupBody, privacyBody, termsBody } from "./legal";
+import { provisionConfig, provisionEntry, provisioningConfigured } from "./provision";
 
 function emptyValues(ref: string): FormValues {
   return {
@@ -271,20 +272,37 @@ async function adminGet(request: Request, env: Env): Promise<Response> {
   }
   const page = Number(url.searchParams.get("page") ?? "1");
   const [settings, list] = await Promise.all([getSettings(env.DB), listSubmissions(env.DB, page)]);
+  const provisionParam = url.searchParams.get("provision") ?? "";
   const notice =
     url.searchParams.get("saved") === "1"
       ? content.admin.saved
       : url.searchParams.get("deleted") === "1"
         ? content.admin.deleted
-        : null;
+        : url.searchParams.get("provisioned") === "1"
+          ? content.admin.provisioned
+          : null;
   const error =
     url.searchParams.get("settings") === "invalid"
       ? "Check the settings and try again."
       : url.searchParams.get("deleted") === "missing"
         ? content.admin.deleteMissing
-        : null;
+        : provisionParam === "failed"
+          ? content.admin.provisionFailed
+          : provisionParam === "busy"
+            ? content.admin.provisionBusy
+            : provisionParam === "unavailable"
+              ? content.admin.provisionUnavailable
+              : null;
   return htmlResponse(
-    adminDashboardPage({ session, settings, list, notice, error }),
+    adminDashboardPage({
+      session,
+      settings,
+      list,
+      notice,
+      error,
+      panelUrl: provisionConfig(env)?.panelUrl ?? content.panelUrl,
+      provisioningEnabled: provisioningConfigured(env),
+    }),
     200,
     request.method,
   );
@@ -316,6 +334,26 @@ async function handleAdminSettings(request: Request, env: Env): Promise<Response
     now: new Date(),
   });
   return redirect("/admin?saved=1", 303);
+}
+
+async function handleAdminProvision(request: Request, env: Env): Promise<Response> {
+  const session = await readAdminSession(request, env);
+  if (!session) return redirect("/admin?error=forbidden", 303);
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return adminRedirect({ provision: "missing" });
+  }
+  const id = parseEntryId(form.get("id"));
+  const pageRaw = form.get("page");
+  if (id === null) return adminRedirect({ provision: "missing" }, pageRaw);
+  const outcome = await provisionEntry(env, id);
+  if (outcome.state === "missing") return adminRedirect({ deleted: "missing" }, pageRaw);
+  if (outcome.state === "busy") return adminRedirect({ provision: "busy" }, pageRaw);
+  if (outcome.state === "unconfigured") return adminRedirect({ provision: "unavailable" }, pageRaw);
+  if (outcome.state === "failed") return adminRedirect({ provision: "failed" }, pageRaw);
+  return adminRedirect({ provisioned: "1" }, pageRaw);
 }
 
 async function handleAdminDelete(request: Request, env: Env): Promise<Response> {
@@ -387,6 +425,9 @@ async function route(request: Request, env: Env): Promise<Response> {
       }
       if (method === "POST" && url.pathname === "/api/admin/entries/delete") {
         return handleAdminDelete(request, env);
+      }
+      if (method === "POST" && url.pathname === "/api/admin/entries/provision") {
+        return handleAdminProvision(request, env);
       }
       if (method === "GET" && url.pathname === "/api/admin/export.csv") return handleExport(request, env);
       if (method === "POST" && url.pathname === "/api/waitlist") {
