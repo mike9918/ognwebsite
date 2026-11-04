@@ -165,6 +165,7 @@ function successBlock(entry: PublicEntry & { discordInviteUrl: string | null }):
     <p>${escapeHtml(content.success.referral)}</p>
     <label for="referral-link">${escapeHtml(content.success.linkLabel)}</label>
     <input id="referral-link" readonly value="${escapeHtml(entry.referralUrl)}">
+    <p class="note">${escapeHtml(content.success.screening)}</p>
     ${discord}
   </section>`;
 }

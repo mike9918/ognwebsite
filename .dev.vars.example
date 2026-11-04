@@ -17,6 +17,9 @@ ADMIN_DISCORD_IDS=123456789012345678
 # Required for waitlist Discord sign-in and admin Discord sign-in.
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
+# Bot from the SAME Discord application, installed in the target guild.
+DISCORD_BOT_TOKEN=
+DISCORD_GUILD_ID=
 DISCORD_INVITE_URL=
 
 # Empty uses the request origin for referral links (right for local dev).

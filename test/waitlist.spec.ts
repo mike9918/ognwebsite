@@ -2,11 +2,16 @@ import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { snowflakeForAgeDays } from "../src/discord-age";
+import { discordConfigured, readPendingSignup } from "../src/discord";
+import { signPayload } from "../src/signed";
 
 type TestEnv = Env & { TEST_MIGRATIONS: D1Migration[] };
 
 const originalFetch = globalThis.fetch;
 let sequence = 0;
+let joinStatus = 201;
+let joinCalls = 0;
+let mockScope = "identify email guilds.join";
 let mockUser: {
   id: string;
   username: string;
@@ -36,10 +41,17 @@ function installFetchMock(): void {
       return Response.json({ success: false, hostname: "example.com", "error-codes": ["invalid-input-response"] });
     }
     if (url === "https://discord.com/api/oauth2/token") {
-      return Response.json({ access_token: "discord-access" });
+      return Response.json({ access_token: "discord-access", scope: mockScope });
     }
     if (url === "https://discord.com/api/users/@me") {
       return Response.json(mockUser);
+    }
+    if (url.startsWith("https://discord.com/api/v10/guilds/123456789012345678/members/")) {
+      joinCalls += 1;
+      expect(init?.method).toBe("PUT");
+      expect(new Headers(init?.headers).get("Authorization")).toBe("Bot test-bot-token");
+      expect(JSON.parse(String(init?.body))).toEqual({ access_token: "discord-access" });
+      return joinStatus === 204 ? new Response(null, { status: 204 }) : Response.json({ pending: true }, { status: joinStatus });
     }
     return originalFetch(input, init);
   };
@@ -47,6 +59,9 @@ function installFetchMock(): void {
 
 beforeEach(async () => {
   sequence = 0;
+  joinStatus = 201;
+  joinCalls = 0;
+  mockScope = "identify email guilds.join";
   mockUser = {
     id: snowflakeForAgeDays(60),
     username: "ada",
@@ -132,7 +147,7 @@ describe("pages", () => {
 
     const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?ref=CODE12"));
     const waitlist = await page.text();
-    expect(waitlist).toContain("Continue with Discord");
+    expect(waitlist).toContain("Connect Discord &amp; Join OGN");
     expect(waitlist).toContain("Is it really free?");
     expect(waitlist).toContain('value="CODE12"');
     expect(waitlist).not.toContain('name="email"');
@@ -141,6 +156,67 @@ describe("pages", () => {
 });
 
 describe("discord sign-up", () => {
+  it("requires the bot configuration and rejects expired signed drafts", async () => {
+    expect(discordConfigured({ ...env, DISCORD_BOT_TOKEN: "" })).toBe(false);
+    expect(discordConfigured({ ...env, DISCORD_GUILD_ID: "not-a-guild" })).toBe(false);
+    const draft = await signPayload(JSON.stringify({ runType: "vanilla", runDetail: "", ref: "", state: "test", expiresAt: Date.now() - 1 }), env.DISCORD_CLIENT_SECRET);
+    const request = workerRequest("https://opengamenode.com/wishlist", { headers: { Cookie: `ogn_oauth_pending=${encodeURIComponent(draft)}` } });
+    expect(await readPendingSignup(request, env)).toBeNull();
+  });
+  it.each([201, 204])("records Discord membership and notification consent for status %s", async (status) => {
+    joinStatus = status;
+    await discordSignup();
+    const row = await env.DB.prepare("SELECT discord_id, discord_joined_at, discord_dm_consent_at FROM waitlist").first();
+    expect(row?.discord_id).toBe(mockUser.id);
+    expect(row?.discord_joined_at).toBeTruthy();
+    expect(row?.discord_dm_consent_at).toBeTruthy();
+    expect(joinCalls).toBe(1);
+  });
+
+  it.each([403, 429, 500])("does not complete signup when Discord join returns %s", async (status) => {
+    joinStatus = status;
+    const start = await startDiscord({ run_type: "modpack", run_detail: "Create", ref: "FRIEND12" });
+    const callback = await finishDiscord(start);
+    expect(callback.headers.get("Location")).toBe("/wishlist?error=discord_join");
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(0);
+    const cookies = start.headers.getSetCookie().map(c => c.split(";")[0]).join("; ");
+    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?error=discord_join", { headers: { Cookie: cookies } }));
+    const html = await page.text();
+    expect(html).toContain('value="modpack" checked');
+    expect(html).toContain('value="Create"');
+    expect(html).toContain('value="FRIEND12"');
+    expect(html).toContain("Your signup is not complete");
+    joinStatus = 204;
+    await discordSignup({ run_type: "modpack", run_detail: "Create" });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(1);
+  });
+
+  it("rejects missing join consent before calling the guild endpoint", async () => {
+    mockScope = "identify email";
+    const callback = await finishDiscord(await startDiscord());
+    expect(callback.headers.get("Location")).toBe("/wishlist?error=discord_join");
+    expect(joinCalls).toBe(0);
+  });
+
+  it("does not attach membership to another Discord identity with the same email", async () => {
+    await discordSignup();
+    mockUser = { ...mockUser, id: snowflakeForAgeDays(100) };
+    const callback = await finishDiscord(await startDiscord());
+    expect(callback.headers.get("Location")).toBe("/wishlist?error=discord_conflict");
+    expect(joinCalls).toBe(1);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(1);
+  });
+
+  it("preserves the draft after cancelled OAuth without joining or signing up", async () => {
+    const start = await startDiscord({ run_detail: "Fabric" });
+    const cookies = start.headers.getSetCookie().map(c => c.split(";")[0]).join("; ");
+    const callback = await exports.default.fetch(workerRequest("https://opengamenode.com/api/auth/discord/callback?error=access_denied", { headers: { Cookie: cookies } }));
+    expect(callback.headers.get("Location")).toBe("/wishlist?error=discord");
+    expect(callback.headers.getSetCookie().join(";")).not.toContain("ogn_oauth_pending=");
+    expect(joinCalls).toBe(0);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(0);
+  });
+
   it("creates one row and returns the same entry for the same Discord account", async () => {
     const first = await discordSignup({ run_type: "modpack", run_detail: "Create" });
     expect(first.welcome).toMatch(/^\/wishlist\?welcome=/);
@@ -216,7 +292,7 @@ describe("discord sign-up", () => {
       ),
     );
     expect(badState.headers.get("Location")).toBe("/wishlist?error=discord");
-    expect(location.searchParams.get("scope")).toBe("identify email");
+    expect(location.searchParams.get("scope")).toBe("identify email guilds.join");
   });
 
   it("counts referrals and respects open or closed and the cap", async () => {

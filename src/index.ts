@@ -15,7 +15,7 @@ import {
 } from "./admin";
 import { content } from "./content";
 import { exportCsv } from "./csv";
-import { beginDiscord, discordConfigured, discordErrorMessage, finishDiscord } from "./discord";
+import { beginDiscord, discordConfigured, discordErrorMessage, finishDiscord, readPendingSignup } from "./discord";
 import {
   canonicalOrigin,
   cleanText,
@@ -185,6 +185,8 @@ function knownWishlistError(code: string): string | null {
     code === "discord" ||
     code === "discord_email" ||
     code === "discord_new" ||
+    code === "discord_join" ||
+    code === "discord_conflict" ||
     code === "closed" ||
     code === "full"
   ) {
@@ -196,12 +198,13 @@ function knownWishlistError(code: string): string | null {
 async function homeGet(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
+  const draft = await readPendingSignup(request, env);
   const blocked = await signupBlockedReason(env.DB);
   const view: WishlistView = {
     discordEnabled: discordConfigured(env),
     accepting: blocked === null,
     siteKey: env.TURNSTILE_SITE_KEY,
-    values: emptyValues(ref),
+    values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
     error:
       blocked === "closed"
         ? content.errors.closed
@@ -219,6 +222,7 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
   const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
   const errorCode = url.searchParams.get("error") ?? "";
   const error = knownWishlistError(errorCode);
+  const draft = await readPendingSignup(request, env);
   const blocked = await signupBlockedReason(env.DB);
   if (welcome) {
     const row = await findByRef(env.DB, welcome);
@@ -243,7 +247,7 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
     discordEnabled: discordConfigured(env),
     accepting: blocked === null,
     siteKey: env.TURNSTILE_SITE_KEY,
-    values: emptyValues(ref),
+    values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
     error: error ?? (blocked === "closed" ? content.errors.closed : blocked === "full" ? content.errors.full : null),
     success: null,
   }, 200);
