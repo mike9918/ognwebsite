@@ -17,6 +17,8 @@ export default defineConfig(async () => ({
           ADMIN_DISCORD_IDS: "111222333444555666",
           DISCORD_CLIENT_ID: "discord-client",
           DISCORD_CLIENT_SECRET: "discord-secret",
+          DISCORD_BOT_TOKEN: "test-bot-token",
+          DISCORD_GUILD_ID: "123456789012345678",
           DISCORD_INVITE_URL: "https://discord.gg/example",
           PUBLIC_ORIGIN: "https://opengamenode.com",
         },

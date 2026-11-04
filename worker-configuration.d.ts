@@ -13,6 +13,8 @@ interface __BaseEnv_Env {
 	ADMIN_DISCORD_IDS: string;
 	DISCORD_CLIENT_ID: string;
 	DISCORD_CLIENT_SECRET: string;
+	DISCORD_BOT_TOKEN: string;
+	DISCORD_GUILD_ID: string;
 	DISCORD_INVITE_URL: string;
 	PUBLIC_ORIGIN: string;
 }

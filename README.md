@@ -48,6 +48,8 @@ Set secrets with `npx wrangler secret put <NAME>`. `.dev.vars` supplies them loc
 | `ADMIN_DISCORD_IDS` | Comma-separated Discord user ids allowed into `/admin` |
 | `DISCORD_CLIENT_ID` | Discord OAuth client id |
 | `DISCORD_CLIENT_SECRET` | Discord OAuth secret |
+| `DISCORD_BOT_TOKEN` | Bot token from the same application, stored only as a Worker secret |
+| `DISCORD_GUILD_ID` | Target OGN server ID |
 | `DISCORD_INVITE_URL` | Shown after sign-up. Empty hides the link |
 | `PUBLIC_ORIGIN` | `https://opengamenode.com` in production. Empty locally |
 
@@ -57,7 +59,7 @@ Production `TURNSTILE_HOSTNAMES` is `opengamenode.com,www.opengamenode.com`.
 
 Discord OAuth scopes:
 
-- Waitlist: `identify email`
+- Waitlist: `identify email guilds.join`
 - Admin: `identify`
 
 ## Checks
@@ -98,3 +100,25 @@ npm run check
 - Help guides: drafted from the confirmed product facts. Placeholder-free, but worth a read before publishing.
 
 Ads are not on this site. AdSense and the consent banner belong to the panel at `panel.opengamenode.com`.
+
+## Discord waitlist join rollout
+
+Before publishing, apply migration `0003_discord_join.sql` and configure the two
+new bindings above. Install the bot from the OAuth application's own Bot page
+in OGN with Create Instant Invite permission. Do not request Administrator.
+Keep the existing OAuth callback URLs. Admin OAuth still requests only identify.
+
+The callback requests consent to join OGN and receive provisioning notifications,
+then uses Discord's Add Guild Member API. Both 201 (joined) and 204 (existing
+member) succeed. Errors, bans, rate limits and timeouts do not finalize signup.
+The signed pending draft preserves choices for ten minutes; retry starts fresh
+OAuth. Tokens are never written to D1, cookies or logs. A Discord join followed
+by a database failure is safe to retry: Discord returns 204 on the next attempt.
+Membership screening is not bypassed; the success page asks users to finish it.
+
+Existing rows retain NULL join/DM-consent timestamps until the user completes
+this flow. Do not treat legacy rows as confirmed members or opted into DMs.
+Future provisioning should recheck membership and use discord_id to address DMs,
+with email fallback. This change does not send DMs or provision game servers.
+Smoke-test new members, existing members, cancelled consent, screening and a
+failed join using a test Discord application/guild before production release.
