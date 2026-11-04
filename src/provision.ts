@@ -119,6 +119,15 @@ export function panelServerName(row: WaitlistRow): string {
   return (base ? `${base} server` : `Server-${row.id}`).slice(0, 48);
 }
 
+// Calagopus passes egg defaults through unchanged, and Minecraft eggs ship
+// EULA=false. The installer and the first start both stop on that, leaving a
+// server nobody can play on until someone ticks the box by hand and reinstalls.
+function variableValue(variable: CalagopusEggVariable): string {
+  const name = variable.env_variable ?? "";
+  if (/(^|_)eula$/i.test(name)) return "true";
+  return variable.default_value ?? "";
+}
+
 export function buildServerPayload(options: {
   ownerUuid: string;
   eggUuid: string;
@@ -166,7 +175,7 @@ export function buildServerPayload(options: {
       .filter((variable) => variable.env_variable)
       .map((variable) => ({
         env_variable: variable.env_variable as string,
-        value: variable.default_value ?? "",
+        value: variableValue(variable),
       })),
   };
 }

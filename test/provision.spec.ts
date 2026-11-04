@@ -104,6 +104,7 @@ function installFetchMock(): void {
           variables: [
             { env_variable: "MEMORY", default_value: "2048" },
             { env_variable: "SERVER_JARFILE", default_value: "server.jar" },
+            { env_variable: "EULA", default_value: "false" },
           ],
         });
       }
@@ -251,6 +252,9 @@ describe("provisioning", () => {
     expect(server.variables).toEqual([
       { env_variable: "MEMORY", value: "2048" },
       { env_variable: "SERVER_JARFILE", value: "server.jar" },
+      // Every other variable keeps the egg default; EULA is accepted so the
+      // installer and first start can run.
+      { env_variable: "EULA", value: "true" },
     ]);
     expect(server.deployment).toEqual({
       location_uuids: ["66666666-6666-4666-8666-666666666666"],

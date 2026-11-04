@@ -98,6 +98,14 @@ rejected link fails the provision instead of sending a message that promises a
 sign-in that would not work; clear that error by fixing the panel permissions.
 Without the UUID, the DM and email ask the user to sign in by email instead.
 
+### Server creation
+
+Servers are created stopped, with the egg installer enabled, so the install runs
+before anyone presses Start. Any egg variable named `EULA` (or ending in `_EULA`)
+is sent as `true`: Minecraft eggs default it to `false`, which leaves the install
+and the first start refusing to run until someone accepts it by hand and
+reinstalls. Every other variable keeps the egg's own default value.
+
 Production `TURNSTILE_HOSTNAMES` is `opengamenode.com,www.opengamenode.com`.
 
 Discord OAuth scopes:
