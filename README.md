@@ -80,11 +80,15 @@ the panel account stay the same person. The panel only does that when the link
 already exists: a Discord sign-in with no link either creates a second account or
 stops with `user_already_exists` when the Discord email matches ours.
 
-- Panel → Admin → OAuth Providers → Discord: enable it, allow login, and turn on
-  **API linkable**. That switch is what lets an API key create links.
+- Panel → Admin → OAuth Providers → Discord → General: turn on **Linkable with
+  API Keys**. Only a signed-in administrator can set it, and it is what lets an
+  API key create links. On a panel build without that switch, PATCH the provider
+  from the browser console while signed in:
+  `await fetch('/api/admin/oauth-providers/<provider>', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_linkable: true }) }).then(r => r.status)`
 - `CALAGOPUS_DISCORD_PROVIDER_UUID` in `wrangler.jsonc` is that provider's UUID
   (the provider page shows it, and `GET /api/auth/oauth` lists it publicly).
-- The API key needs `users.oauth-links` and `users.impersonate` as well.
+- The API key needs `users.oauth-links` and `users.impersonate` as well. Without
+  either, the panel answers 403 and the row says which two things to turn on.
 
 Provisioning links `waitlist.discord_id` to the new panel user before it creates
 the server, and a retry re-runs only that step. While the provider UUID is set, a

@@ -363,6 +363,9 @@ describe("provisioning", () => {
       .first<Record<string, string | null>>();
     expect(row?.provision_state).toBe("failed");
     expect(row?.provision_error).toContain("HTTP 403");
+    // The panel's guard message is opaque; the row names the two switches.
+    expect(row?.provision_error).toContain("API linkable");
+    expect(row?.provision_error).toContain("users.impersonate");
     expect(row?.calagopus_user_uuid).toBe(USER_UUID);
 
     // Fixing the panel permissions and retrying resumes at the link step.

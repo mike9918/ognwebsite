@@ -407,7 +407,17 @@ export async function provisionEntry(
     // configured: a DM promising Discord sign-in must not be a lie.
     step = "panel_link";
     if (config.discordProviderUuid && row.discord_id) {
-      await client.linkOauth(user.uuid, config.discordProviderUuid, row.discord_id);
+      try {
+        await client.linkOauth(user.uuid, config.discordProviderUuid, row.discord_id);
+      } catch (error) {
+        // The panel guards identity links hard, and its own message is opaque.
+        if (error instanceof CalagopusError && error.status === 403) {
+          throw new Error(
+            "Calagopus refused to link Discord (HTTP 403). A panel admin has to enable API linkable on the Discord provider and give the API key the users.impersonate permission, then retry.",
+          );
+        }
+        throw error;
+      }
     }
 
     step = "server";
