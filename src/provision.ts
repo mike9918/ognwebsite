@@ -11,10 +11,23 @@ import { content, type RunType } from "./content";
 import { cleanText } from "./http";
 import { notifyConfigured, sendDiscordReady, sendReadyEmail } from "./notify";
 import { planFor, type ServerPlan } from "./plans";
+import { getSettings } from "./settings";
 import type { WaitlistRow } from "./signup";
 
-const STALE_CLAIM_MS = 5 * 60 * 1000;
+// A claim older than this is treated as abandoned (waitUntil crash, hung panel).
+// Sweep and the admin Retry control use the same window as the claim UPDATE.
+export const STALE_CLAIM_MS = 5 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function claimIsStale(
+  startedAt: string | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!startedAt) return true;
+  const started = Date.parse(startedAt);
+  if (!Number.isFinite(started)) return true;
+  return started < now.getTime() - STALE_CLAIM_MS;
+}
 
 export type ProvisionConfig = {
   baseUrl: string;
@@ -92,8 +105,17 @@ export function provisioningConfigured(env: Env): boolean {
   return provisionConfig(env) !== null && notifyConfigured(env);
 }
 
+// Automatic vs Manual comes from Admin → Sign-up controls. Default is Manual so
+// a missing setting can never create servers on its own. Panel/mail config must
+// still be present before either mode can provision.
+export async function autoProvisionEnabled(env: Env): Promise<boolean> {
+  if (!provisioningConfigured(env)) return false;
+  const settings = await getSettings(env.DB);
+  return settings.autoProvision;
+}
+
 // Calagopus usernames are 3-15 characters of letters, numbers and underscores.
-// The referral code makes the suffix unique and stays inside that budget.
+// The signup code makes the suffix unique and stays inside that budget.
 export function panelUsername(row: WaitlistRow): string {
   const base = (row.discord_username ?? "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 6);
   const suffix = (row.ref_code ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
@@ -398,7 +420,7 @@ export async function provisionEntry(
      SET provision_state = 'running', provision_started_at = ?, provision_error = NULL,
          provision_attempts = provision_attempts + 1
      WHERE id = ?
-       AND (provision_state IS NULL OR provision_state = 'failed'
+       AND (provision_state IS NULL OR provision_state IN ('queued', 'failed')
             OR (provision_state = 'running'
                 AND (provision_started_at IS NULL OR provision_started_at < ?)))`,
   )

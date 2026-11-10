@@ -34,6 +34,11 @@
     { "pattern": "opengamenode.com", "custom_domain": true },
     { "pattern": "www.opengamenode.com", "custom_domain": true }
   ],
+  // Safety net for a sign-up whose inline provisioning did not finish. The
+  // sweep is a no-op while the panel and mail settings are missing.
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   // Without keep_vars, `wrangler deploy` deletes every variable that is not in
   // this file — including values set in the Cloudflare dashboard. The
   // provisioning settings live in the dashboard (see README), so they must
@@ -41,6 +46,8 @@
   "keep_vars": true,
   "vars": {
     "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30",
+    // Automatic vs Manual provisioning is an admin setting in D1
+    // (waitlist_settings.auto_provision), not a Wrangler var.
     // The panel's Discord OAuth provider UUID, from Admin -> OAuth Providers
     // (also listed by GET /api/auth/oauth). Provisioning links each panel user
     // to their Discord id so their first sign-in lands in that account. Remove

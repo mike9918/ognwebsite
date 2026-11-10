@@ -1,6 +1,6 @@
 import { content } from "./content";
 import { describePlan, planFor } from "./plans";
-import { positionFor, type WaitlistRow } from "./signup";
+import type { WaitlistRow } from "./signup";
 
 // The "new waitlist entry" card lives in the ops channel. It is posted once,
 // when the person completes the Discord signup, and edited in place when
@@ -92,18 +92,13 @@ function code(value: string): string {
   return `\`${value.replace(/[`\n\r]/g, "").trim()}\``;
 }
 
-function fill(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
-}
-
 export function waitlistCard(
   row: WaitlistRow,
-  position: number,
   provision: CardProvision | null,
 ): string {
   const { labels, heading, headingProvisioned, notLinked } = content.board;
   const lines = [
-    fill(provision ? headingProvisioned : heading, { place: String(position) }),
+    provision ? headingProvisioned : heading,
     `${labels.discord}: ${code(row.discord_username ?? notLinked)} (${
       row.discord_id ? code(row.discord_id) : notLinked
     })`,
@@ -143,12 +138,11 @@ export async function postWaitlistCard(
   try {
     const channelId = await resolveChannel(env);
     if (!channelId) return;
-    const position = await positionFor(db, row);
     const response = await fetch(`${API}/channels/${channelId}/messages`, {
       method: "POST",
       headers: authorization(env),
       body: JSON.stringify({
-        content: waitlistCard(row, position, null),
+        content: waitlistCard(row, null),
         // Nothing in a visitor-supplied handle should be able to ping the guild.
         allowed_mentions: { parse: [] },
       }),
@@ -184,14 +178,13 @@ export async function updateWaitlistCard(
 ): Promise<void> {
   if (!botConfigured(env) || !row.discord_channel_id || !row.discord_message_id) return;
   try {
-    const position = await positionFor(db, row);
     const response = await fetch(
       `${API}/channels/${row.discord_channel_id}/messages/${row.discord_message_id}`,
       {
         method: "PATCH",
         headers: authorization(env),
         body: JSON.stringify({
-          content: waitlistCard(row, position, provision),
+          content: waitlistCard(row, provision),
           allowed_mentions: { parse: [] },
         }),
         signal: AbortSignal.timeout(10_000),

@@ -4,7 +4,7 @@ export const content = {
   name: "OpenGameNode",
   siteOrigin: "https://opengamenode.com",
   description:
-    "Free Minecraft server hosting from OpenGameNode. Start a server, invite your friends, keep your world. Join the waitlist with Discord.",
+    "Free Minecraft server hosting from OpenGameNode. Sign up free with Discord, start a server, invite your friends, keep your world.",
   tagline: "Your game. Your server. Open to everyone.",
   headline: "Free game servers. More time to play.",
   supporting: "Start a server. Invite your friends. Make it yours.",
@@ -18,20 +18,20 @@ export const content = {
   },
   home: {
     lead:
-      "Free, ad-supported hosting with a four-hour session, a simple panel and no ad before you press Start. Join the waitlist and we'll open a spot in small batches.",
-    primaryAction: "Join the waitlist",
+      "Free, ad-supported hosting with a four-hour session, a simple panel and no ad before you press Start. Sign up free with Discord — we'll set up your server and tell you when it's ready.",
+    primaryAction: "Sign up free with Discord",
     secondaryAction: "Sign in to the panel",
-    waitlistHeading: "Join the waitlist",
+    signupHeading: "Sign up free",
     stepsHeading: "How it works",
-    stepsIntro: "Three steps from the waitlist to your first session.",
+    stepsIntro: "Three steps from signing up to your first session.",
     steps: [
       {
-        title: "Join the waitlist",
-        body: "Sign in with Discord so each person gets one spot. We never post or DM on your behalf — we only read your Discord id, username and verified email.",
+        title: "Sign up with Discord",
+        body: "One tap, one account, no password to invent. We use your verified Discord email to create your panel account. We never post or send DMs on your behalf.",
       },
       {
-        title: "Start your server",
-        body: "Pick vanilla, plugins on Paper, or a modpack in the panel. Each Start gives you a session of about four hours, with a countdown on your server page.",
+        title: "Pick what you're running",
+        body: "Choose vanilla, plugins on Paper, or a modpack. We create your server stopped and ready in the panel after sign-up.",
       },
       {
         title: "Invite your friends",
@@ -42,7 +42,8 @@ export const content = {
     features: [
       {
         title: "Instant start",
-        body: "No queue in normal use. Click Start and your server comes up.",
+        body:
+          "Click Start and your server comes up. A server only queues if 4 others are already starting or the node is full.",
       },
       {
         title: "Your mods and files",
@@ -96,6 +97,11 @@ export const content = {
         "Yes. Free Minecraft servers, paid for by one small display ad per panel page. Supporter ($1.99/month) is optional and just removes ads and adds a few extras.",
     },
     {
+      question: "How do I sign up?",
+      answer:
+        "Tap Sign up free with Discord on the homepage, pick what you're running, and sign in with Discord. We create your panel account from your verified Discord email, so there's no form to fill in and no password to set up. We'll DM or email you when your server is ready to Start in the panel.",
+    },
+    {
       question: "How long does my server run?",
       answer:
         "Each start gives you about 4 hours, with a countdown on your server page. In the last 10 minutes you can click Extend to add about 4 more hours, once per day. If nobody's on for 5 minutes, the server shuts off and that session ends. Click Start in the panel for a fresh 4 hours. Players joining won't start it. Separately, you're signed out of the panel after an hour of inactivity, but your servers keep running.",
@@ -107,7 +113,8 @@ export const content = {
     },
     {
       question: "Is there a queue?",
-      answer: "Only when the node is full. Supporters get priority.",
+      answer:
+        "A server queues only if 4 others are already starting or the node is full. Supporters get priority, which is not a guaranteed spot.",
     },
     {
       question: "Why are there ads?",
@@ -158,7 +165,7 @@ export const content = {
     age: "Under 18? You need a parent or guardian's OK before you subscribe.",
     cta: "Become a Supporter",
     ctaNote:
-      "Supporter billing isn't open yet. Join the waitlist and we'll let you know when it is.",
+      "Supporter billing isn't open yet. We'll announce it on the site and in our Discord.",
     adNote:
       "Ads only ever appear inside the panel, one per page. There are no ads on this site.",
   },
@@ -184,27 +191,35 @@ export const content = {
       "NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.",
   },
   form: {
-    heading: "Join the waitlist",
+    heading: "Sign up free",
     intro:
-      "Connect Discord to join the OGN server and save your waitlist spot. We use your verified Discord email and may send you a DM when your game server is ready, with email as a fallback. We never message on your behalf.",
+      "Sign up with Discord to get your free server. We use your verified Discord email to create your panel account, and we may DM you there when your server is ready. We never message on your behalf.",
     runLegend: "What will you run?",
     vanilla: "Vanilla",
     plugins: "Plugins (Paper)",
     modpack: "Modpack",
     detailLabel: "Modpack or version (optional)",
-    discordButton: "Connect Discord & Join OGN",
+    discordButton: "Sign up free with Discord",
   },
+  // The sign-up screen becomes a status page once a row exists. "preparing" is
+  // a server that is queued or being created, "ready" is a finished provision,
+  // and "problem" is a failure the admin table can retry. Preparing copy depends
+  // on Automatic vs Manual provisioning (AUD-66 / AUD-67).
   success: {
-    heading: "You're on the list.",
-    existing: "This Discord account was already on the list.",
-    reached: "We'll notify you when your server is ready. Keep an eye on {email} and allow direct messages from OGN server members for Discord notifications.",
-    place: "Your place is {position}.",
-    referral: "Each friend who joins moves you up the list.",
-    linkLabel: "Your link",
-    copy: "Copy link",
-    copied: "Copied",
+    heading: "You're signed up.",
+    existing: "You already have an account with this Discord, so we've kept it.",
+    preparingAutomatic:
+      "Your sign-up is confirmed and we're setting up your server now. We'll DM or email you as soon as it's ready.",
+    preparingManual:
+      "Thanks — we've got your Discord account. We'll notify you by Discord DM and email when your server is ready to Start.",
+    ready: "Your server is ready. Open the panel and press Start when you want to play.",
+    problem:
+      "Your sign-up is saved, but we hit a problem creating your server. Our team can see it and retry. Ask in our Discord if you'd like an update.",
+    emailNote: "We'll use {email} if we need to reach you.",
+    panelAction: "Open the panel",
     discord: "Open OGN Discord",
-    screening: "Open OGN Discord and complete any server rules or membership screening. Joining does not override your DM privacy settings.",
+    screening:
+      "Open OGN Discord and complete any server rules or membership screening. Joining does not override your DM privacy settings.",
   },
   errors: {
     validation: "Check the form and try again.",
@@ -212,44 +227,67 @@ export const content = {
     turnstile: "We couldn't confirm that submission. Please try again.",
     rate: "Too many sign-ups from this network. Please try again later.",
     discord: "Discord sign-in didn't complete. Please try again.",
-    discordJoin: "We could not add you to OGN Discord. Your signup is not complete. Your choices are saved for 10 minutes; connect Discord again to retry.",
-    discordConflict: "That email is linked to a different waitlist identity. Sign in with your original Discord account or contact support@opengamenode.com.",
+    discordJoin:
+      "We could not add you to OGN Discord. Your signup is not complete. Your choices are saved for 10 minutes; connect Discord again to retry.",
+    discordConflict:
+      "That email is linked to a different sign-up. Sign in with your original Discord account or contact support@opengamenode.com.",
     discordEmail: "Verify the email on your Discord account, then try again.",
-    discordNew: "That Discord account is too new to join right now. Try again later.",
-    closed: "The waitlist is closed right now.",
-    full: "The waitlist is full right now.",
+    discordNew: "That Discord account is too new to sign up right now. Try again later.",
+    closed: "Sign-ups are paused right now. Check back soon.",
+    full: "We're not taking new sign-ups for a moment. Spots reopen as servers free up.",
     unavailable: "Sign-up isn't available right now.",
     generic: "Something went wrong. Please try again.",
   },
+  // Shown in place of the sign-up button when the backend capacity flag says the
+  // free slots are taken. The cap value is never shown.
+  capacity: {
+    heading: "At capacity right now",
+    body:
+      "OpenGameNode isn't taking new free sign-ups at the moment. Please check back soon — the sign-up button will return when there's room again. You can still say hello in our Discord.",
+    discord: "Join the Discord",
+  },
   admin: {
     saved: "Settings saved.",
-    deleted: "Waitlist entry deleted.",
-    deleteMissing: "That waitlist entry was already gone.",
+    deleted: "Sign-up deleted.",
+    deleteMissing: "That sign-up was already gone.",
     delete: "Delete",
     provision: "Provision",
     provisionRetry: "Retry provision",
     provisionRunning: "Provisioning…",
+    provisionQueued: "Setting up…",
+    provisionPending: "Waiting for Provision",
+    provisionStale: "Stuck provisioning — safe to retry",
     provisionedLabel: "Provisioned",
     openServer: "Open server",
     provisioned: "Provisioned: panel account, server and notifications are done.",
     provisionFailed: "Provisioning failed. Fix the cause and retry.",
-    provisionBusy: "That entry is already being provisioned.",
+    provisionBusy: "That sign-up is already being provisioned.",
     provisionUnavailable: "Provisioning is not configured yet.",
-    forbidden: "That Discord account is not allowed to manage the waitlist.",
+    forbidden: "That Discord account is not allowed to manage sign-ups.",
     discordFailed: "Discord sign-in didn't complete. Please try again.",
     unavailable: "Admin sign-in isn't configured yet.",
+    atCapacity: "At capacity",
+    capacityNote: "Free slots used",
+    modeManual: "Manual — staff click Provision",
+    modeAutomatic: "Automatic — provision after sign-up",
+    modeNote:
+      "Cap applies in both modes. Automatic needs panel and mail settings; otherwise rows stay queued until you provision by hand.",
+    tableNoteManual:
+      "Sign-ups arrive queued. Provision creates the Calagopus account and server, then DMs and emails the user.",
+    tableNoteAutomatic:
+      "Automatic mode starts provisioning after Discord sign-up. Provision stays available as a retry path.",
   },
   provision: {
     dmIntro: "Your OpenGameNode server is ready.",
-    dmNote: "Sign in with {email} and press Start when you want to play.",
+    dmNote: "You signed up as {email}. Sign in with that address and press Start when you want to play.",
     dmNoteDiscord:
-      "Sign in at {panel} with Discord — your account is already linked, so there's no password to set up. Press Start when you want to play.",
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to set up. Press Start when you want to play. A server only queues if 4 others are already starting or the node is full.",
     emailSubject: "Your OpenGameNode server is ready",
     emailIntro: "Your server is ready.",
     emailNote:
-      "Sign in with {email}. If you don't have a panel password yet, use “Forgot password” on the panel sign-in page.",
+      "You signed up as {email}. If you don't have a panel password yet, use “Forgot password” on the panel sign-in page.",
     emailNoteDiscord:
-      "Sign in at {panel} with Discord — your account is already linked, so there's no password to remember. If you'd rather use an email password, choose “Forgot password”.",
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to remember. If you'd rather use an email password, choose “Forgot password”. A server only queues if 4 others are already starting or the node is full.",
     labels: {
       server: "Server",
       plan: "Plan",
@@ -258,18 +296,17 @@ export const content = {
     },
     closing: "Questions? Email support@opengamenode.com or ask in the Discord.",
   },
-  // Staff-facing card in the Discord ops channel. The placeholders are filled
-  // with the entry's place in the queue.
+  // Staff-facing card in the Discord ops channel.
   board: {
-    heading: "📥 New waitlist entry · place {place}",
-    headingProvisioned: "✅ Provisioned · place {place}",
+    heading: "📥 New sign-up",
+    headingProvisioned: "✅ Provisioned",
     notLinked: "none",
     labels: {
       discord: "Discord",
       email: "Email",
       plan: "Plan",
       wants: "Wants",
-      ref: "Ref",
+      ref: "Code",
       joined: "Joined",
       server: "Server",
       panelUser: "Panel user",

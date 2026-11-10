@@ -8,6 +8,7 @@ import {
   secretsMatch,
   setCookie,
 } from "./http";
+import { claimIsStale } from "./provision";
 import { getSettings, updateSettings, type WaitlistSettings } from "./settings";
 import { randomToken, signPayload, unsignPayload } from "./signed";
 import type { WaitlistRow } from "./signup";
@@ -156,7 +157,8 @@ export async function listSubmissions(
       .prepare(
         `SELECT id, email, discord_id, discord_username, run_type, run_detail, ref_code, referred_by,
                 referral_count, ip_hash, country, created_at, invited_at, wave,
-                provision_state, provision_error, server_uuid, server_name, provisioned_at,
+                provision_state, provision_started_at, provision_attempts, provision_error,
+                server_uuid, server_name, provisioned_at,
                 calagopus_user_uuid, discord_dm_consent_at, dm_sent_at, email_sent_at
          FROM waitlist
          ORDER BY created_at DESC, id DESC
@@ -223,7 +225,7 @@ export function adminLoginPage(error: string | null): string {
   return adminLayout(
     "Admin",
     `<section class="card">
-      <h1>Waitlist admin</h1>
+      <h1>Sign-up admin</h1>
       <p class="supporting">Sign in with the Discord account listed in ADMIN_DISCORD_IDS.</p>
       ${alert}
       <p><a class="button" href="/api/auth/admin/discord">Continue with Discord</a></p>
@@ -243,6 +245,12 @@ export function adminDashboardPage(options: {
   const notice = options.notice ? `<p class="notice" role="status">${escapeHtml(options.notice)}</p>` : "";
   const error = options.error ? `<p class="alert" role="alert">${escapeHtml(options.error)}</p>` : "";
   const capValue = options.settings.signupCap === null ? "" : String(options.settings.signupCap);
+  const atCapacity =
+    options.settings.signupCap !== null &&
+    options.settings.occupiedCount >= options.settings.signupCap;
+  const capacityBadge = atCapacity
+    ? `<p class="alert" role="status">${escapeHtml(content.admin.atCapacity)}</p>`
+    : "";
   const totalPages = Math.max(1, Math.ceil(options.list.total / options.list.pageSize));
   const prev =
     options.list.page > 1
@@ -259,32 +267,46 @@ export function adminDashboardPage(options: {
           ? `<input type="hidden" name="page" value="${options.list.page}">`
           : "";
       const state = row.provision_state ?? "";
+      // A crashed waitUntil leaves the row `running`. After the stale window the
+      // claim is reclaimable — show Retry instead of a permanent disabled button.
+      const runningStale = state === "running" && claimIsStale(row.provision_started_at);
+      const canRetry = state === "failed" || runningStale;
       const provisionForm = `<form method="post" action="/api/admin/entries/provision" class="inline-form" data-confirm-provision>
             <input type="hidden" name="id" value="${row.id}">
             ${pageField}
             <button class="button" type="submit">${escapeHtml(
-              state === "failed" ? content.admin.provisionRetry : content.admin.provision,
+              canRetry ? content.admin.provisionRetry : content.admin.provision,
             )}</button>
           </form>`;
       const provisionAction = !options.provisioningEnabled
         ? `<button class="button button-secondary" type="button" disabled title="${escapeHtml(content.admin.provisionUnavailable)}">${escapeHtml(content.admin.provision)}</button>`
-        : state === "running"
+        : state === "running" && !runningStale
           ? `<button class="button button-secondary" type="button" disabled>${escapeHtml(content.admin.provisionRunning)}</button>`
           : state === "done"
             ? `<a class="button button-secondary" href="${escapeHtml(`${options.panelUrl}/server/${row.server_uuid ?? ""}`)}">${escapeHtml(content.admin.openServer)}</a>`
             : provisionForm;
-      const provisionNote = row.provision_error
-        ? `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`
-        : state === "done"
-          ? `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`
-          : "";
+      let provisionNote = "";
+      if (row.provision_error) {
+        provisionNote = `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`;
+      } else if (state === "done") {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`;
+      } else if (runningStale) {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionStale)}</div>`;
+      } else if (state === "queued") {
+        provisionNote = `<div class="muted">${escapeHtml(
+          options.settings.autoProvision
+            ? content.admin.provisionQueued
+            : content.admin.provisionPending,
+        )}</div>`;
+      } else if (state === "running") {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionRunning)}</div>`;
+      }
       return `<tr>
       <td>${row.id}</td>
       <td>${escapeHtml(row.email)}</td>
       <td>${escapeHtml(row.discord_username ?? "")}<div class="muted">${escapeHtml(row.discord_id ?? "")}</div></td>
       <td>${escapeHtml(row.run_type)}${row.run_detail ? `<div class="muted">${escapeHtml(row.run_detail)}</div>` : ""}</td>
       <td>${escapeHtml(row.ref_code)}</td>
-      <td>${row.referral_count}</td>
       <td>${escapeHtml(row.country ?? "")}</td>
       <td>${escapeHtml(row.created_at)}</td>
       <td>
@@ -310,40 +332,52 @@ export function adminDashboardPage(options: {
     </div>
     ${notice}${error}
     <section class="card" aria-labelledby="settings-heading">
-      <h1 id="settings-heading">Waitlist controls</h1>
+      <h1 id="settings-heading">Sign-up controls</h1>
       <p class="note">${options.list.total} sign-up${options.list.total === 1 ? "" : "s"} stored.</p>
+      ${capacityBadge}
       <form method="post" action="/api/admin/settings" class="admin-settings">
         <fieldset>
           <legend>Status</legend>
           <label class="choice"><input type="radio" name="is_open" value="1"${options.settings.isOpen ? " checked" : ""}> <span>Open</span></label>
           <label class="choice"><input type="radio" name="is_open" value="0"${options.settings.isOpen ? "" : " checked"}> <span>Closed</span></label>
         </fieldset>
+        <fieldset>
+          <legend>Provisioning</legend>
+          <label class="choice"><input type="radio" name="auto_provision" value="0"${options.settings.autoProvision ? "" : " checked"}> <span>${escapeHtml(content.admin.modeManual)}</span></label>
+          <label class="choice"><input type="radio" name="auto_provision" value="1"${options.settings.autoProvision ? " checked" : ""}> <span>${escapeHtml(content.admin.modeAutomatic)}</span></label>
+          <p class="note">${escapeHtml(content.admin.modeNote)}</p>
+        </fieldset>
         <div>
           <label for="signup-cap">Signup cap</label>
           <input id="signup-cap" name="signup_cap" type="number" min="0" step="1" inputmode="numeric" placeholder="No cap" value="${escapeHtml(capValue)}">
-          <p class="note">Leave blank for no cap. Current count: ${options.settings.signupCount}${
-            options.settings.signupCap === null ? "" : ` / ${options.settings.signupCap}`
-          }.</p>
+          <p class="note">Starts at 25 slots. Leave blank for no cap. ${escapeHtml(content.admin.capacityNote)}: ${
+            options.settings.occupiedCount
+          }${options.settings.signupCap === null ? "" : ` / ${options.settings.signupCap}`}.
+            ${options.list.total} row${options.list.total === 1 ? "" : "s"} stored in total. A cap of 0 takes the site out of sign-up mode.</p>
         </div>
         <button class="button" type="submit">Save</button>
       </form>
       <p class="admin-links"><a href="/api/admin/export.csv">Download CSV</a></p>
     </section>
     <section aria-labelledby="subs-heading">
-      <h2 id="subs-heading">Submissions</h2>
+      <h2 id="subs-heading">Sign-ups</h2>
       <div class="table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Ref</th><th>Referrals</th><th>Country</th><th>Created</th><th>Actions</th>
+              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Code</th><th>Country</th><th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="9">No submissions yet.</td></tr>`}
+            ${rows || `<tr><td colspan="8">No sign-ups yet.</td></tr>`}
           </tbody>
         </table>
       </div>
-      <p class="note">Page ${options.list.page} of ${totalPages}. Provision creates the Calagopus account and server, then DMs and emails the user.</p>
+      <p class="note">Page ${options.list.page} of ${totalPages}. ${escapeHtml(
+        options.settings.autoProvision
+          ? content.admin.tableNoteAutomatic
+          : content.admin.tableNoteManual,
+      )}</p>
       <div class="actions">${prev}${next}</div>
     </section>`,
   );
@@ -351,15 +385,28 @@ export function adminDashboardPage(options: {
 
 export async function parseSettingsForm(
   form: FormData,
-): Promise<{ ok: true; isOpen: boolean; signupCap: number | null } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; isOpen: boolean; signupCap: number | null; autoProvision: boolean }
+  | { ok: false; message: string }
+> {
   const openRaw = form.get("is_open");
   if (openRaw !== "0" && openRaw !== "1") {
     return { ok: false, message: "Choose open or closed." };
   }
+  const modeRaw = form.get("auto_provision");
+  if (modeRaw !== "0" && modeRaw !== "1") {
+    return { ok: false, message: "Choose Automatic or Manual provisioning." };
+  }
   const capRaw = typeof form.get("signup_cap") === "string" ? String(form.get("signup_cap")).trim() : "";
-  if (capRaw === "") return { ok: true, isOpen: openRaw === "1", signupCap: null };
-  if (!/^\d+$/.test(capRaw)) return { ok: false, message: "Cap must be a whole number or blank." };
-  return { ok: true, isOpen: openRaw === "1", signupCap: Number(capRaw) };
+  if (capRaw !== "" && !/^\d+$/.test(capRaw)) {
+    return { ok: false, message: "Cap must be a whole number or blank." };
+  }
+  return {
+    ok: true,
+    isOpen: openRaw === "1",
+    signupCap: capRaw === "" ? null : Number(capRaw),
+    autoProvision: modeRaw === "1",
+  };
 }
 
 export { getSettings, updateSettings };

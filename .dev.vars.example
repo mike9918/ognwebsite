@@ -14,7 +14,7 @@ ADMIN_TOKEN=replace-with-a-long-random-string
 # Comma-separated Discord user snowflakes allowed to open /admin.
 ADMIN_DISCORD_IDS=123456789012345678
 
-# Required for waitlist Discord sign-in and admin Discord sign-in.
+# Required for Discord sign-up and admin Discord sign-in.
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 # Bot from the SAME Discord application, installed in the target guild.

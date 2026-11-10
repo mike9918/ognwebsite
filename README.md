@@ -1,6 +1,6 @@
 # OpenGameNode
 
-The public site for OpenGameNode. The homepage is `/` and carries the Discord waitlist form itself. `/wishlist` still exists as the focused sign-up page that Discord OAuth and referral links return to. Admin is `/admin`.
+The public site for OpenGameNode. The homepage is `/` and carries the Discord sign-up form itself. `/signup` is the focused sign-up page; `/wishlist` is kept as an alias because the Discord OAuth callback already points at it. Admin is `/admin`.
 
 This is a Cloudflare Worker with static assets and a D1 database. It does not include the game panel. That will be `panel.opengamenode.com`.
 
@@ -32,7 +32,39 @@ The remote D1 database is `ogn-waitlist`. Apply new migrations with:
 npx wrangler d1 migrations apply ogn-waitlist --remote
 ```
 
-Sign-ups require Discord. Rows store Discord id, username, verified email, and a salted SHA-256 of the IP. `waitlist_settings` holds open/closed and the optional signup cap. Servers are managed from the web panel at `panel.opengamenode.com`, not from Discord.
+Sign-ups require Discord. Rows store Discord id, username, verified email, and a salted SHA-256 of the IP. `waitlist_settings` holds open/closed, the optional signup cap, and Automatic vs Manual provisioning. Servers are managed from the web panel at `panel.opengamenode.com`, not from Discord.
+
+A new sign-up is written with `provision_state = 'queued'`. Manual mode (default)
+waits for staff to click Provision in `/admin`. Automatic mode provisions in the
+background after the Discord redirect. Provisioning is resumable, so the same
+row holds the claim, the panel ids and the notification timestamps.
+
+### Sign-up capacity
+
+The cap is the number of rows holding a free slot: `provision_state` in
+`queued`, `running` or `done`. Failed rows do not hold a slot, so a hard failure
+never silently eats capacity. Migration `0008_open_signups_cleanup.sql` deletes
+any leftover waitlist-era rows (`provision_state IS NULL`).
+
+`GET /api/capacity` returns `{ "accepting": boolean }` and nothing else: the cap
+value is never public. The homepage and `/signup` read the same check and swap
+the button for the at-capacity block, so no surface can advertise a number.
+
+A cap of `0` means at capacity (an instant pause), and leaving it blank means no
+cap. The launch cap is 25 slots (`migrations/0007_signup_cap_default.sql`), and
+staff change it, or clear it, in `/admin` without a deploy. The insert itself
+carries the check (`INSERT … SELECT … WHERE count < cap`), so two sign-ups racing
+cannot overshoot it.
+
+`triggers.crons` runs `sweepSignups` every five minutes when Automatic mode is
+on: it retries rows that are still `queued` after a minute, and failed rows under
+three attempts. Without panel and mail settings, or with Manual mode, it is a
+no-op.
+
+Migration `0006_signup_slots.sql` adds the partial index behind that count. It
+rewrites no rows. Migration `0007_signup_cap_default.sql` only fills in the cap
+when it is still unset. Migration `0008` deletes legacy waitlist rows and adds
+`auto_provision` to settings.
 
 ## Secrets and vars
 
@@ -59,6 +91,10 @@ Set secrets with `npx wrangler secret put <NAME>`. `.dev.vars` supplies them loc
 | `RESEND_API_KEY` | Fallback email sender when Microsoft 365 is not configured |
 
 `MIN_DISCORD_ACCOUNT_AGE_DAYS` is a Wrangler var (default `30`). Accounts younger than that cannot join.
+
+Provisioning mode is an admin setting (Manual by default). Switch it under
+Admin → Sign-up controls. Automatic mode only runs when panel and mail settings
+are also present.
 
 Provisioning settings are dashboard vars, not `wrangler.jsonc` vars: `CALAGOPUS_URL`,
 `CALAGOPUS_NEST_UUID`, `CALAGOPUS_EGG_VANILLA`, `CALAGOPUS_EGG_PLUGINS`,
@@ -138,27 +174,33 @@ npm run check
 
 | Path | What it is |
 | --- | --- |
-| `/` | Frontpage: hero, how it works, features, sessions, games, Supporter teaser, FAQ preview, waitlist form. `/?ref=` redirects to `/wishlist?ref=` |
-| `/wishlist` | Discord waitlist form and success screen |
+| `/` | Frontpage: hero, how it works, features, sessions, games, Supporter teaser, FAQ preview, sign-up form |
+| `/signup` | Discord sign-up form and sign-up status screen (alias of `/wishlist`) |
+| `/wishlist` | Canonical URL for the sign-up page; Discord OAuth returns here |
 | `/faq` | Full FAQ, final approved copy |
 | `/supporter` | Supporter tier, $1.99/month. Checkout button is a placeholder until Stripe is live |
 | `/help` | Index of the five help guides |
 | `/help/<slug>` | `first-server`, `invite-friends`, `upload-a-world`, `backups`, `supporter-billing` |
 | `/terms`, `/privacy`, `/aup` | Legal pages rendered from `src/legal.ts` |
-| `/admin` | Discord-gated admin: submissions, delete, open/close, cap |
-| `/api/auth/discord` | Waitlist Discord start |
+| `/admin` | Discord-gated admin: sign-ups, delete, open/close, cap, Automatic/Manual mode, retry provisioning |
+| `/api/auth/discord` | Discord sign-up start |
 | `/api/auth/admin/discord` | Admin Discord start |
-| `/api/admin/settings` | Save open/close and cap |
-| `/api/admin/entries/delete` | Delete one waitlist row (admin session) |
+| `/api/admin/settings` | Save open/close, cap, and provisioning mode |
+| `/api/admin/entries/delete` | Delete one sign-up row (admin session) |
 | `/api/admin/entries/provision` | Create the Calagopus account and server, DM and email (admin session) |
 | `/api/admin/export.csv` | CSV export (admin session or bearer token) |
+| `/api/capacity` | Public `{ accepting: boolean }` flag for the at-capacity state |
 
 `www.opengamenode.com` redirects to the apex. Custom domains for the apex and `www` are in `wrangler.jsonc`.
 
 ## Provisioning
 
-**Provision** on a waitlist row runs the whole onboarding in the Worker, in this
-order: Calagopus account (`external_id` = `ogn-<row id>`, panel email included) →
+Sign-ups default to Manual: **Provision** on a row runs the whole flow by hand.
+Admin → Sign-up controls can switch to Automatic, which starts the same work
+after the Discord callback returns (`ctx.waitUntil`), and the cron sweep retries
+anything that did not finish. **Provision** stays the retry path either way.
+
+Provisioning runs the whole onboarding in the Worker, in this order: Calagopus account (`external_id` = `ogn-<row id>`, panel email included) →
 server with the plan for that row's `run_type` → Discord DM → email. It is one
 request so the admin sees the result immediately, and it stays resumable: the
 panel UUIDs are written to D1 as soon as they exist, so a retry after a failure
@@ -223,8 +265,9 @@ second source of truth and a hop that cannot tell the admin table what happened.
 n8n is still a fine place for ops alerts or staff-channel notifications later,
 as a fire-and-forget call after the row is `done`.
 
-Before release, apply migration `0004_provisioning.sql` and smoke-test one row
-per run type, a retry after a forced panel failure, and a member with DMs closed.
+Before release, apply migrations `0004_provisioning.sql` and
+`0006_signup_slots.sql`, then smoke-test one row per run type, a retry after a
+forced panel failure, a member with DMs closed, and the at-capacity state.
 
 ## Brand
 

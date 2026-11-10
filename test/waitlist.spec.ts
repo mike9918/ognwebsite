@@ -82,7 +82,7 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM waitlist"),
     env.DB.prepare("DELETE FROM signup_attempts"),
     env.DB.prepare(
-      "UPDATE waitlist_settings SET is_open = 1, signup_cap = NULL, updated_at = ?",
+      "UPDATE waitlist_settings SET is_open = 1, signup_cap = NULL, auto_provision = 0, updated_at = ?",
     ).bind(new Date().toISOString()),
   ]);
 });
@@ -146,21 +146,66 @@ async function discordSignup(fields: Record<string, string> = {}): Promise<{
 }
 
 describe("pages", () => {
-  it("serves the homepage and Discord-only waitlist", async () => {
+  it("serves the homepage and the Discord-only sign-up", async () => {
     const home = await exports.default.fetch(workerRequest("https://opengamenode.com/"));
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Free game servers. More time to play.");
     expect(html).toContain('action="/api/auth/discord"');
+    expect(html).toContain("Sign up free with Discord");
     expect(html).toContain("Open to everyone");
 
-    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?ref=CODE12"));
-    const waitlist = await page.text();
-    expect(waitlist).toContain("Connect Discord &amp; Join OGN");
-    expect(waitlist).toContain("Is it really free?");
-    expect(waitlist).toContain('value="CODE12"');
-    expect(waitlist).not.toContain('name="email"');
-    expect(waitlist).not.toContain("/api/waitlist");
+    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/signup"));
+    expect(page.status).toBe(200);
+    const signup = await page.text();
+    expect(signup).toContain("Sign up free with Discord");
+    expect(signup).toContain("Is it really free?");
+    expect(signup).not.toContain('name="ref"');
+    expect(signup).not.toContain('name="email"');
+    expect(signup).not.toContain("/api/waitlist");
+  });
+
+  it("exposes capacity as a boolean and nothing else", async () => {
+    const response = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/capacity"),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ accepting: true });
+  });
+
+  it("replaces the sign-up form with an at-capacity message", async () => {
+    await env.DB.prepare(
+      "UPDATE waitlist_settings SET is_open = 1, signup_cap = 0, updated_at = ?",
+    )
+      .bind(new Date().toISOString())
+      .run();
+    const home = await (
+      await exports.default.fetch(workerRequest("https://opengamenode.com/"))
+    ).text();
+    expect(home).toContain("At capacity right now");
+    expect(home).not.toContain('action="/api/auth/discord"');
+    expect(home).not.toContain("limited slot");
+    const flag = await (
+      await exports.default.fetch(workerRequest("https://opengamenode.com/api/capacity"))
+    ).json();
+    expect(flag).toEqual({ accepting: false });
+  });
+
+  it("keeps waitlist framing off every public page", async () => {
+    for (const path of ["/", "/wishlist", "/signup", "/faq", "/help", "/help/first-server"]) {
+      const html = await (
+        await exports.default.fetch(workerRequest(`https://opengamenode.com${path}`))
+      ).text();
+      // Visible text only: internal ids, asset names and CSS classes may still
+      // say "waitlist" without any visitor seeing the word.
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .toLowerCase();
+      expect(text, path).not.toContain("waitlist");
+      expect(text, path).not.toContain("limited slot");
+    }
   });
 });
 
@@ -178,7 +223,7 @@ describe("discord sign-up", () => {
   it("requires the bot configuration and rejects expired signed drafts", async () => {
     expect(discordConfigured({ ...env, DISCORD_BOT_TOKEN: "" })).toBe(false);
     expect(discordConfigured({ ...env, DISCORD_GUILD_ID: "not-a-guild" })).toBe(false);
-    const draft = await signPayload(JSON.stringify({ runType: "vanilla", runDetail: "", ref: "", state: "test", expiresAt: Date.now() - 1 }), env.DISCORD_CLIENT_SECRET);
+    const draft = await signPayload(JSON.stringify({ runType: "vanilla", runDetail: "", state: "test", expiresAt: Date.now() - 1 }), env.DISCORD_CLIENT_SECRET);
     const request = workerRequest("https://opengamenode.com/wishlist", { headers: { Cookie: `ogn_oauth_pending=${encodeURIComponent(draft)}` } });
     expect(await readPendingSignup(request, env)).toBeNull();
   });
@@ -195,7 +240,7 @@ describe("discord sign-up", () => {
   it("posts one waitlist card per person and stores it for the provisioned edit", async () => {
     await discordSignup({ run_type: "modpack", run_detail: "ATM10" });
     expect(cardMessages).toHaveLength(1);
-    expect(cardMessages[0].content).toContain("New waitlist entry");
+    expect(cardMessages[0].content).toContain("New sign-up");
     expect(cardMessages[0].content).toContain("ada@example.com");
     expect(cardMessages[0].content).toContain("ATM10");
     expect(cardMessages[0].content).toContain("3 GB RAM · Modpack");
@@ -216,7 +261,7 @@ describe("discord sign-up", () => {
 
   it.each([403, 429, 500])("does not complete signup when Discord join returns %s", async (status) => {
     joinStatus = status;
-    const start = await startDiscord({ run_type: "modpack", run_detail: "Create", ref: "FRIEND12" });
+    const start = await startDiscord({ run_type: "modpack", run_detail: "Create" });
     const callback = await finishDiscord(start);
     expect(callback.headers.get("Location")).toBe("/wishlist?error=discord_join");
     expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(0);
@@ -225,7 +270,7 @@ describe("discord sign-up", () => {
     const html = await page.text();
     expect(html).toContain('value="modpack" checked');
     expect(html).toContain('value="Create"');
-    expect(html).toContain('value="FRIEND12"');
+    expect(html).not.toContain('name="ref"');
     expect(html).toContain("Your signup is not complete");
     joinStatus = 204;
     await discordSignup({ run_type: "modpack", run_detail: "Create" });
@@ -263,8 +308,10 @@ describe("discord sign-up", () => {
     expect(first.welcome).toMatch(/^\/wishlist\?welcome=/);
     const page = await exports.default.fetch(workerRequest(`https://opengamenode.com${first.welcome}`));
     const html = await page.text();
-    expect(html).toContain("You&#39;re on the list.");
+    expect(html).toContain("You&#39;re signed up.");
     expect(html).toContain("ada@example.com");
+    expect(html).toContain("we&#39;ve got your Discord account");
+    expect(html).not.toContain("setting up your server now");
 
     const again = await discordSignup({ run_type: "vanilla" });
     expect(again.welcome).toBe(first.welcome);
@@ -277,6 +324,34 @@ describe("discord sign-up", () => {
       }),
     );
     expect(emailOnly.status).toBe(410);
+  });
+
+  it("queues every sign-up for provisioning", async () => {
+    await discordSignup();
+    const row = await env.DB.prepare("SELECT provision_state FROM waitlist").first<{
+      provision_state: string | null;
+    }>();
+    expect(row?.provision_state).toBe("queued");
+  });
+
+  it("does not charge failed rows against the cap", async () => {
+    await env.DB.prepare(
+      `INSERT INTO waitlist (email, run_type, ref_code, ip_hash, created_at, provision_state)
+       VALUES ('failed@example.com', 'vanilla', 'FAILED01', 'hash', '2026-01-01T00:00:00.000Z', 'failed')`,
+    ).run();
+    await env.DB.prepare("UPDATE waitlist_settings SET signup_cap = 1 WHERE id = 1").run();
+    const signup = await discordSignup();
+    expect(signup.welcome).toMatch(/^\/wishlist\?welcome=/);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(2);
+  });
+
+  it("shows automatic preparing copy when auto provision is on", async () => {
+    await env.DB.prepare("UPDATE waitlist_settings SET auto_provision = 1 WHERE id = 1").run();
+    const first = await discordSignup();
+    const html = await (
+      await exports.default.fetch(workerRequest(`https://opengamenode.com${first.welcome}`))
+    ).text();
+    expect(html).toContain("setting up your server now");
   });
 
   it("returns a Discord location as JSON for the waitlist script", async () => {
@@ -336,10 +411,8 @@ describe("discord sign-up", () => {
     expect(location.searchParams.get("scope")).toBe("identify email guilds.join");
   });
 
-  it("counts referrals and respects open or closed and the cap", async () => {
-    const anchor = await discordSignup();
-    const ref = (anchor.welcome.match(/welcome=([A-Z0-9]+)/) ?? [])[1];
-    expect(ref).toBeTruthy();
+  it("respects open or closed and the cap", async () => {
+    await discordSignup();
 
     mockUser = {
       id: snowflakeForAgeDays(70),
@@ -347,24 +420,16 @@ describe("discord sign-up", () => {
       email: "friend1@example.com",
       verified: true,
     };
-    await discordSignup({ ref: ref! });
+    await discordSignup();
     mockUser = {
       id: snowflakeForAgeDays(75),
       username: "friend2",
       email: "friend2@example.com",
       verified: true,
     };
-    await discordSignup({ ref: ref!.toLowerCase() });
+    await discordSignup();
 
-    const csv = await (
-      await exports.default.fetch(
-        workerRequest("https://opengamenode.com/api/admin/export.csv", {
-          headers: { Authorization: "Bearer test-admin-token" },
-        }),
-      )
-    ).text();
-    const anchorRow = csv.split("\r\n").find((line) => line.includes(`,${ref},`));
-    expect(anchorRow?.split(",")[8]).toBe("2");
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(3);
 
     await exports.default.fetch(
       workerRequest("https://opengamenode.com/api/admin/settings", {
@@ -373,7 +438,7 @@ describe("discord sign-up", () => {
           "Content-Type": "application/x-www-form-urlencoded",
           Cookie: await adminSessionCookie(),
         },
-        body: formBody({ is_open: "0", signup_cap: "" }),
+        body: formBody({ is_open: "0", signup_cap: "", auto_provision: "0" }),
       }),
     );
     mockUser = {
@@ -393,7 +458,7 @@ describe("discord sign-up", () => {
           "Content-Type": "application/x-www-form-urlencoded",
           Cookie: await adminSessionCookie(),
         },
-        body: formBody({ is_open: "1", signup_cap: "3" }),
+        body: formBody({ is_open: "1", signup_cap: "3", auto_provision: "0" }),
       }),
     );
     mockUser = {
@@ -451,9 +516,12 @@ describe("admin", () => {
     );
     expect(page.status).toBe(200);
     const html = await page.text();
-    expect(html).toContain("Waitlist controls");
+    expect(html).toContain("Sign-up controls");
     expect(html).toContain("ada@example.com");
     expect(html).toContain('name="signup_cap"');
+    expect(html).toContain('name="auto_provision"');
+    expect(html).toContain("Manual — staff click Provision");
+    expect(html).not.toContain("Referrals");
     expect(html).toContain("Signed in as");
 
     const forbiddenUser = {
@@ -517,7 +585,7 @@ describe("admin", () => {
       workerRequest("https://opengamenode.com/admin?deleted=1", { headers: { Cookie: cookie } }),
     );
     const afterHtml = await after.text();
-    expect(afterHtml).toContain("Waitlist entry deleted.");
+    expect(afterHtml).toContain("Sign-up deleted.");
     expect(afterHtml).not.toContain("delete-me@example.com");
 
     const missing = await exports.default.fetch(
