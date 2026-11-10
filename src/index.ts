@@ -255,19 +255,15 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
 
 async function adminGet(request: Request, env: Env): Promise<Response> {
   if (!adminConfigured(env)) {
-    return htmlResponse(adminLoginPage(content.admin.unavailable), 503, request.method);
+    // Look like a missing page rather than an admin outage.
+    return htmlResponse(adminLoginPage(null), 404, request.method);
   }
   const session = await readAdminSession(request, env);
   const url = new URL(request.url);
-  const errorCode = url.searchParams.get("error") ?? "";
   if (!session) {
-    const error =
-      errorCode === "forbidden"
-        ? content.admin.forbidden
-        : errorCode === "discord"
-          ? content.admin.discordFailed
-          : null;
-    return htmlResponse(adminLoginPage(error), 200, request.method);
+    // Obscure the admin entrypoint: same body + status as a public 404.
+    // Sign-in remains at /api/auth/admin/discord.
+    return htmlResponse(adminLoginPage(null), 404, request.method);
   }
   const page = Number(url.searchParams.get("page") ?? "1");
   const [settings, list] = await Promise.all([getSettings(env.DB), listSubmissions(env.DB, page)]);
