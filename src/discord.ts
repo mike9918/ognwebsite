@@ -16,6 +16,7 @@ import {
   setCookie,
 } from "./http";
 import { randomToken, signPayload, unsignPayload } from "./signed";
+import { autoProvisionEnabled, provisionEntry } from "./provision";
 import { signupBlockedReason } from "./settings";
 import {
   createSignup,
@@ -120,6 +121,7 @@ export async function beginDiscord(
 export async function finishDiscord(
   request: Request,
   env: Env,
+  ctx?: ExecutionContext,
 ): Promise<{ entry: PublicEntry; cookies: string[] } | { error: DiscordAuthError; cookies: string[] }> {
   const secure = isSecure(request);
   const cleared = [clearCookie(STATE_COOKIE, secure)];
@@ -235,16 +237,32 @@ export async function finishDiscord(
     // the message that entry already has. A row with no card yet (created
     // before this feature, or deleted in Discord) gets one on the next signup.
     if (!created.row.discord_message_id) await postWaitlistCard(env, env.DB, created.row);
+    // Open sign-ups provision immediately, after the redirect is sent so the
+    // person never waits on the panel. A crash or a slow Calagopus call leaves
+    // the row queued, which the cron sweep retries.
+    if (!created.existing && ctx && autoProvisionEnabled(env)) {
+      ctx.waitUntil(
+        provisionEntry(env, created.row.id).catch((error: unknown) => {
+          console.error(
+            JSON.stringify({
+              event: "provision_inline_failed",
+              id: created.row.id,
+              message: error instanceof Error ? error.message : "error",
+            }),
+          );
+        }),
+      );
+    }
     console.log(
       JSON.stringify({
-        event: "waitlist_signup",
+        event: "signup_created",
         existing: created.existing,
         country: clientCountry(request),
         via: "discord",
       }),
     );
     return {
-      entry: await toPublic(env.DB, created.row, origin, created.existing),
+      entry: toPublic(created.row, created.existing),
       cookies: [...cleared, clearCookie(PENDING_COOKIE, secure)],
     };
   } catch {

@@ -37,7 +37,7 @@ The service runs on a best-effort basis. It is free and ad-supported, and we do 
 - If nobody is on a server for about five minutes, it shuts off and its session is canceled. The timer does not keep running. A player joining won't start it again. The owner clicks Start again to begin a fresh session.
 - When a session ends, the server shuts off until the owner clicks Start.
 - Worlds and files are kept between sessions unless removed under these terms.
-- A queue applies only when the node is full. Supporters get priority, which is not a guaranteed spot.
+- A server queues only if 4 others are already starting or the node is full. Supporters get priority, which is not a guaranteed spot.
 - Ads are display ads on panel pages only. You never have to watch an ad to start a server.
 - Capacity, session length, queue rules, features and limits may change. Where a change is significant, we'll try to announce it on our site or Discord first.
 

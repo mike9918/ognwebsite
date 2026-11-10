@@ -34,6 +34,7 @@ import {
   supporterPage,
   textPage,
   wishlistPage,
+  type Capacity,
   type FormValues,
   type WishlistView,
 } from "./html";
@@ -42,6 +43,7 @@ import { signupBlockedReason } from "./settings";
 import { findGuide } from "./guides";
 import { aupBody, privacyBody, termsBody } from "./legal";
 import { provisionConfig, provisionEntry, provisioningConfigured } from "./provision";
+import { sweepSignups } from "./sweep";
 
 function emptyValues(ref: string): FormValues {
   return {
@@ -142,14 +144,18 @@ async function handleDiscordStart(request: Request, env: Env): Promise<Response>
     if (asJson) return jsonResponse({ error: result.error }, 400);
     return redirect(`/wishlist?error=${result.error}`, 303);
   }
-  // Prefer JSON for the waitlist script so navigation to Discord is a top-level
+  // Prefer JSON for the sign-up script so navigation to Discord is a top-level
   // assign, not a form 302 (which Chrome can block via form-action).
   if (asJson) return jsonResponse({ location: result.location }, 200, result.cookies);
   return redirect(result.location, 302, result.cookies);
 }
 
-async function handleDiscordCallback(request: Request, env: Env): Promise<Response> {
-  const result = await finishDiscord(request, env);
+async function handleDiscordCallback(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const result = await finishDiscord(request, env, ctx);
   if ("error" in result) {
     return redirect(`/wishlist?error=${result.error}`, 303, result.cookies);
   }
@@ -171,7 +177,7 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="waitlist.csv"',
+      "Content-Disposition": 'attachment; filename="signups.csv"',
       "Cache-Control": "no-store",
       ...securityHeaders(),
     },
@@ -203,15 +209,10 @@ async function homeGet(request: Request, env: Env): Promise<Response> {
   const blocked = await signupBlockedReason(env.DB);
   const view: WishlistView = {
     discordEnabled: discordConfigured(env),
-    accepting: blocked === null,
+    capacity: (blocked ?? "open") as Capacity,
     siteKey: env.TURNSTILE_SITE_KEY,
     values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
-    error:
-      blocked === "closed"
-        ? content.errors.closed
-        : blocked === "full"
-          ? content.errors.full
-          : null,
+    error: null,
     success: null,
   };
   return htmlResponse(homePage(view, inviteUrl(env)), 200, request.method);
@@ -228,28 +229,22 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
   if (welcome) {
     const row = await findByRef(env.DB, welcome);
     if (row) {
-      const entry = await toPublic(
-        env.DB,
-        row,
-        canonicalOrigin(request, env.PUBLIC_ORIGIN),
-        false,
-      );
       return renderWishlist(request, env, {
         discordEnabled: false,
-        accepting: true,
+        capacity: "open",
         siteKey: "",
         values: emptyValues(""),
         error: null,
-        success: { ...entry, discordInviteUrl: inviteUrl(env) },
+        success: { ...toPublic(row, false), discordInviteUrl: inviteUrl(env) },
       }, 200);
     }
   }
   return renderWishlist(request, env, {
     discordEnabled: discordConfigured(env),
-    accepting: blocked === null,
+    capacity: (blocked ?? "open") as Capacity,
     siteKey: env.TURNSTILE_SITE_KEY,
     values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
-    error: error ?? (blocked === "closed" ? content.errors.closed : blocked === "full" ? content.errors.full : null),
+    error,
     success: null,
   }, 200);
 }
@@ -377,7 +372,7 @@ function isAssetPath(pathname: string): boolean {
   return /\.[a-zA-Z0-9]+$/.test(pathname);
 }
 
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
       if (url.hostname === "www.opengamenode.com") {
@@ -403,7 +398,7 @@ async function route(request: Request, env: Env): Promise<Response> {
 
       if (method === "POST" && url.pathname === "/api/auth/discord") return handleDiscordStart(request, env);
       if (method === "GET" && url.pathname === "/api/auth/discord/callback") {
-        return handleDiscordCallback(request, env);
+        return handleDiscordCallback(request, env, ctx);
       }
       if (method === "GET" && url.pathname === "/api/auth/admin/discord") {
         const result = await beginAdminDiscord(request, env);
@@ -430,13 +425,23 @@ async function route(request: Request, env: Env): Promise<Response> {
         return handleAdminProvision(request, env);
       }
       if (method === "GET" && url.pathname === "/api/admin/export.csv") return handleExport(request, env);
+      // Public capacity flag: a boolean only. The cap value never leaves the
+      // admin page, so no public surface can derive how many spots exist.
+      if (method === "GET" && url.pathname === "/api/capacity") {
+        const blocked = await signupBlockedReason(env.DB);
+        return jsonResponse({ accepting: blocked === null }, 200);
+      }
       if (method === "POST" && url.pathname === "/api/waitlist") {
         return new Response("Gone", { status: 410, headers: securityHeaders() });
       }
 
       if (method === "GET" || method === "HEAD") {
         if (url.pathname === "/") return homeGet(request, env);
-        if (url.pathname === "/wishlist") return wishlistGet(request, env);
+        // /signup is the link the site now uses; /wishlist stays for the OAuth
+        // callback and every referral link already shared.
+        if (url.pathname === "/wishlist" || url.pathname === "/signup") {
+          return wishlistGet(request, env);
+        }
         if (url.pathname === "/faq") return htmlResponse(faqPage(inviteUrl(env)), 200, method);
         if (url.pathname === "/supporter") {
           return htmlResponse(supporterPage(inviteUrl(env)), 200, method);
@@ -494,9 +499,14 @@ async function route(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     // Framing is relaxed for local/preview hosts so the Browser panel can embed
     // the page; production keeps X-Frame-Options: DENY.
-    return relaxFramingForPreview(request, await route(request, env));
+    return relaxFramingForPreview(request, await route(request, env, ctx));
+  },
+  // Safety net for sign-ups whose inline provisioning did not finish: a slow
+  // panel, a crash, or a failed attempt that is still under the attempt cap.
+  async scheduled(_controller, env, ctx): Promise<void> {
+    ctx.waitUntil(sweepSignups(env));
   },
 } satisfies ExportedHandler<Env>;

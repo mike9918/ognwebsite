@@ -10,9 +10,13 @@ export type FormValues = {
   ref: string;
 };
 
+// "open" shows the form, "full" swaps it for the at-capacity message, "closed"
+// is the maintenance switch. The cap value itself is never rendered.
+export type Capacity = "open" | "full" | "closed";
+
 export type WishlistView = {
   discordEnabled: boolean;
-  accepting: boolean;
+  capacity: Capacity;
   siteKey: string;
   values: FormValues;
   error: string | null;
@@ -142,7 +146,7 @@ function heroCopy(): string {
 }
 
 function formHead(view: WishlistView): string {
-  if (!(view.discordEnabled && view.accepting && view.siteKey)) return "";
+  if (view.capacity !== "open" || !view.discordEnabled || !view.siteKey) return "";
   return `<script src="/wishlist.js" defer></script>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`;
 }
@@ -157,14 +161,24 @@ function successBlock(entry: PublicEntry & { discordInviteUrl: string | null }):
     ? `<p><a class="button button-secondary" href="${escapeHtml(entry.discordInviteUrl)}">${escapeHtml(content.success.discord)}</a></p>`
     : "";
   const existing = entry.existing ? `<p>${escapeHtml(content.success.existing)}</p>` : "";
+  const status =
+    entry.status === "ready"
+      ? content.success.ready
+      : entry.status === "problem"
+        ? content.success.problem
+        : content.success.preparing;
+  // Only a finished provisioning has a server to open. A queued person still
+  // gets their email note so they know where the update will arrive.
+  const panel =
+    entry.status === "ready"
+      ? `<p class="actions"><a class="button" href="${escapeHtml(content.panelUrl)}" rel="noopener">${escapeHtml(content.success.panelAction)}</a></p>`
+      : "";
   return `<section class="card success" aria-labelledby="success-heading">
     <h2 id="success-heading">${escapeHtml(content.success.heading)}</h2>
     ${existing}
-    <p>${escapeHtml(content.success.reached.replace("{email}", entry.email))}</p>
-    <p class="place">${escapeHtml(content.success.place.replace("{position}", String(entry.position)))}</p>
-    <p>${escapeHtml(content.success.referral)}</p>
-    <label for="referral-link">${escapeHtml(content.success.linkLabel)}</label>
-    <input id="referral-link" readonly value="${escapeHtml(entry.referralUrl)}">
+    <p class="status" role="status">${escapeHtml(status)}</p>
+    <p class="note">${escapeHtml(content.success.emailNote.replace("{email}", entry.email))}</p>
+    ${panel}
     <p class="note">${escapeHtml(content.success.screening)}</p>
     ${discord}
   </section>`;
@@ -216,11 +230,30 @@ function waitlistForm(view: WishlistView): string {
         </form>`;
 }
 
-function waitlistCard(view: WishlistView, heading = content.form.heading): string {
+// AUD-65: at capacity, the sign-up button is replaced by this block. It carries
+// no count, no cap and no "limited slots" framing.
+function capacityBlock(view: WishlistView, heading: string, inviteUrl: string | null): string {
+  const discord = inviteUrl
+    ? `<p class="actions"><a class="button button-secondary" href="${escapeHtml(inviteUrl)}" rel="noopener">${escapeHtml(content.capacity.discord)}</a></p>`
+    : "";
+  return `<section class="card waitlist-card" aria-labelledby="form-heading">
+        <h2 id="form-heading">${escapeHtml(content.capacity.heading)}</h2>
+        <p role="status">${escapeHtml(content.capacity.body)}</p>
+        ${fieldError(view.error)}
+        ${discord}
+      </section>`;
+}
+
+function waitlistCard(
+  view: WishlistView,
+  heading: string,
+  inviteUrl: string | null,
+): string {
+  if (view.capacity === "full") return capacityBlock(view, heading, inviteUrl);
   let body: string;
-  if (!view.accepting) {
-    body = fieldError(view.error ?? content.errors.closed);
-  } else if (!view.discordEnabled) {
+  if (view.capacity === "closed") {
+    body = fieldError(content.errors.closed);
+  } else if (!view.discordEnabled || !view.siteKey) {
     body = `<p class="alert" role="alert">${escapeHtml(content.errors.unavailable)}</p>`;
   } else {
     body = waitlistForm(view);
@@ -249,7 +282,7 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
           <p class="note">${escapeHtml(content.minecraftNote)}</p>
         </div>
         <div class="hero-side">
-          ${view.success ? successBlock(view.success) : waitlistCard(view, content.home.waitlistHeading)}
+          ${view.success ? successBlock(view.success) : waitlistCard(view, content.home.signupHeading, inviteUrl)}
           <p class="note side-note">
             Prefer the panel? <a href="${content.panelUrl}" rel="noopener">${escapeHtml(content.nav.panel)}</a>
           </p>
@@ -348,6 +381,8 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
 }
 
 export function wishlistPage(view: WishlistView, inviteUrl: string | null): string {
+  // /signup is an alias of this page, so the canonical stays on /wishlist where
+  // the OAuth callback and shared referral links already point.
   if (view.success) {
     return layout({
       title: `${content.success.heading} ${content.name}`,
@@ -370,7 +405,7 @@ export function wishlistPage(view: WishlistView, inviteUrl: string | null): stri
       <section class="hero">
         ${heroCopy()}
       </section>
-      ${waitlistCard(view)}
+      ${waitlistCard(view, content.form.heading, inviteUrl)}
       <section aria-labelledby="features-heading">
         <h2 id="features-heading">${escapeHtml(content.home.featuresHeading)}</h2>
         <p class="note">${escapeHtml(content.minecraftNote)}</p>
@@ -410,7 +445,8 @@ export function wishlistPage(view: WishlistView, inviteUrl: string | null): stri
 export function faqPage(inviteUrl: string | null): string {
   return layout({
     title: `Questions · ${content.name}`,
-    description: "How OpenGameNode servers work: session times, ads, the queue, Supporter, and who can use it.",
+    description:
+      "How OpenGameNode servers work: sign-up, session times, ads, the queue, Supporter, and who can use it.",
     path: "/faq",
     current: "faq",
     inviteUrl,

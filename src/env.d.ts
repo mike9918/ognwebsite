@@ -3,6 +3,9 @@
 // value is optional: a missing one leaves provisioning disabled instead of
 // breaking the site, and `keep_vars` keeps the values across deploys.
 interface Env {
+  // "1" (default) provisions a new sign-up in the background. "0" keeps the
+  // admin Provision button as the only trigger (manual mode).
+  AUTO_PROVISION?: string;
   CALAGOPUS_URL?: string;
   CALAGOPUS_NEST_UUID?: string;
   CALAGOPUS_EGG_VANILLA?: string;

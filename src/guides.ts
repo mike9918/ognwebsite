@@ -14,20 +14,20 @@ export const guides: readonly Guide[] = [
   {
     slug: "first-server",
     title: "Get your first server running",
-    summary: "Join the waitlist, pick what you're running, and start your server from the panel.",
+    summary: "Sign up with Discord, pick what you're running, and start your server from the panel.",
     minutes: 4,
     body: `
-OpenGameNode hosts Minecraft servers for free. This guide walks through the whole thing, from the waitlist to your first join.
+OpenGameNode hosts Minecraft servers for free. This guide walks through the whole thing, from signing up to your first join.
 
-## 1. Join the waitlist
+## 1. Sign up free
 
-Servers are not open to everyone yet. Invites go out in small groups so the first servers stay fast. Use the Discord button on the [waitlist page](/) and sign in with your Discord account.
+Tap Sign up free with Discord on the [homepage](/) or the [sign-up page](/signup), pick what you're running, and sign in with your Discord account. We create your panel account from your verified Discord email, so there's nothing to fill in and no password to set up.
 
-We ask for Discord so each person gets one spot. We never post or send DMs on your behalf, and we only read your Discord ID, username and verified email.
+We ask for Discord so each person gets one account. We never post or send DMs on your behalf, and we only read your Discord ID, username and verified email.
 
 ## 2. Sign in to the panel
 
-When your invite is ready, go to panel.opengamenode.com and sign in with Discord. The panel is where you start your server, see your address and manage your files.
+Go to panel.opengamenode.com and sign in with Discord. The panel is where you start your server, see your address and manage your files.
 
 You're signed out after about an hour of inactivity. Your servers keep running while you're signed out.
 
@@ -37,7 +37,7 @@ Choose vanilla if you want plain Minecraft, plugins if you want Paper with plugi
 
 ## 4. Click Start
 
-Each Start gives you a session of about four hours, with a countdown on your server page. There's no ad to watch first, and no queue unless the node is full.
+Each Start gives you a session of about four hours, with a countdown on your server page. There's no ad to watch first. A server only queues if 4 others are already starting or the node is full.
 
 ## 5. Connect and play
 

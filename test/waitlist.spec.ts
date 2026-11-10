@@ -146,21 +146,66 @@ async function discordSignup(fields: Record<string, string> = {}): Promise<{
 }
 
 describe("pages", () => {
-  it("serves the homepage and Discord-only waitlist", async () => {
+  it("serves the homepage and the Discord-only sign-up", async () => {
     const home = await exports.default.fetch(workerRequest("https://opengamenode.com/"));
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Free game servers. More time to play.");
     expect(html).toContain('action="/api/auth/discord"');
+    expect(html).toContain("Sign up free with Discord");
     expect(html).toContain("Open to everyone");
 
-    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist?ref=CODE12"));
-    const waitlist = await page.text();
-    expect(waitlist).toContain("Connect Discord &amp; Join OGN");
-    expect(waitlist).toContain("Is it really free?");
-    expect(waitlist).toContain('value="CODE12"');
-    expect(waitlist).not.toContain('name="email"');
-    expect(waitlist).not.toContain("/api/waitlist");
+    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/signup?ref=CODE12"));
+    expect(page.status).toBe(200);
+    const signup = await page.text();
+    expect(signup).toContain("Sign up free with Discord");
+    expect(signup).toContain("Is it really free?");
+    expect(signup).toContain('value="CODE12"');
+    expect(signup).not.toContain('name="email"');
+    expect(signup).not.toContain("/api/waitlist");
+  });
+
+  it("exposes capacity as a boolean and nothing else", async () => {
+    const response = await exports.default.fetch(
+      workerRequest("https://opengamenode.com/api/capacity"),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ accepting: true });
+  });
+
+  it("replaces the sign-up form with an at-capacity message", async () => {
+    await env.DB.prepare(
+      "UPDATE waitlist_settings SET is_open = 1, signup_cap = 0, updated_at = ?",
+    )
+      .bind(new Date().toISOString())
+      .run();
+    const home = await (
+      await exports.default.fetch(workerRequest("https://opengamenode.com/"))
+    ).text();
+    expect(home).toContain("At capacity right now");
+    expect(home).not.toContain('action="/api/auth/discord"');
+    expect(home).not.toContain("limited slot");
+    const flag = await (
+      await exports.default.fetch(workerRequest("https://opengamenode.com/api/capacity"))
+    ).json();
+    expect(flag).toEqual({ accepting: false });
+  });
+
+  it("keeps waitlist framing off every public page", async () => {
+    for (const path of ["/", "/wishlist", "/signup", "/faq", "/help", "/help/first-server"]) {
+      const html = await (
+        await exports.default.fetch(workerRequest(`https://opengamenode.com${path}`))
+      ).text();
+      // Visible text only: internal ids, asset names and CSS classes may still
+      // say "waitlist" without any visitor seeing the word.
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+        .toLowerCase();
+      expect(text, path).not.toContain("waitlist");
+      expect(text, path).not.toContain("limited slot");
+    }
   });
 });
 
@@ -195,7 +240,7 @@ describe("discord sign-up", () => {
   it("posts one waitlist card per person and stores it for the provisioned edit", async () => {
     await discordSignup({ run_type: "modpack", run_detail: "ATM10" });
     expect(cardMessages).toHaveLength(1);
-    expect(cardMessages[0].content).toContain("New waitlist entry");
+    expect(cardMessages[0].content).toContain("New sign-up");
     expect(cardMessages[0].content).toContain("ada@example.com");
     expect(cardMessages[0].content).toContain("ATM10");
     expect(cardMessages[0].content).toContain("3 GB RAM · Modpack");
@@ -263,8 +308,9 @@ describe("discord sign-up", () => {
     expect(first.welcome).toMatch(/^\/wishlist\?welcome=/);
     const page = await exports.default.fetch(workerRequest(`https://opengamenode.com${first.welcome}`));
     const html = await page.text();
-    expect(html).toContain("You&#39;re on the list.");
+    expect(html).toContain("You&#39;re signed up.");
     expect(html).toContain("ada@example.com");
+    expect(html).toContain("setting up your server now");
 
     const again = await discordSignup({ run_type: "vanilla" });
     expect(again.welcome).toBe(first.welcome);
@@ -277,6 +323,25 @@ describe("discord sign-up", () => {
       }),
     );
     expect(emailOnly.status).toBe(410);
+  });
+
+  it("queues every sign-up for provisioning", async () => {
+    await discordSignup();
+    const row = await env.DB.prepare("SELECT provision_state FROM waitlist").first<{
+      provision_state: string | null;
+    }>();
+    expect(row?.provision_state).toBe("queued");
+  });
+
+  it("does not charge legacy rows against the cap", async () => {
+    await env.DB.prepare(
+      `INSERT INTO waitlist (email, run_type, ref_code, ip_hash, created_at, provision_state)
+       VALUES ('legacy@example.com', 'vanilla', 'LEGACY01', 'hash', '2026-01-01T00:00:00.000Z', NULL)`,
+    ).run();
+    await env.DB.prepare("UPDATE waitlist_settings SET signup_cap = 1 WHERE id = 1").run();
+    const signup = await discordSignup();
+    expect(signup.welcome).toMatch(/^\/wishlist\?welcome=/);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM waitlist").first("n")).toBe(2);
   });
 
   it("returns a Discord location as JSON for the waitlist script", async () => {
@@ -451,7 +516,7 @@ describe("admin", () => {
     );
     expect(page.status).toBe(200);
     const html = await page.text();
-    expect(html).toContain("Waitlist controls");
+    expect(html).toContain("Sign-up controls");
     expect(html).toContain("ada@example.com");
     expect(html).toContain('name="signup_cap"');
     expect(html).toContain("Signed in as");
@@ -517,7 +582,7 @@ describe("admin", () => {
       workerRequest("https://opengamenode.com/admin?deleted=1", { headers: { Cookie: cookie } }),
     );
     const afterHtml = await after.text();
-    expect(afterHtml).toContain("Waitlist entry deleted.");
+    expect(afterHtml).toContain("Sign-up deleted.");
     expect(afterHtml).not.toContain("delete-me@example.com");
 
     const missing = await exports.default.fetch(

@@ -1,6 +1,6 @@
 import { RUN_TYPES, type RunType } from "./content";
 import { cleanText, sha256Hex } from "./http";
-import { signupBlockedReason } from "./settings";
+import { OCCUPIED_SQL, signupBlockedReason } from "./settings";
 
 const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const RATE_LIMIT = 5;
@@ -47,16 +47,21 @@ export type SignupInput = {
   now: Date;
 };
 
+// The public status of a sign-up. Internal provision_error text is never part
+// of this, so a public page cannot leak panel details or addresses.
+export type SignupStatus = "preparing" | "ready" | "problem";
+
 export type PublicEntry = {
   email: string;
   refCode: string;
-  referralUrl: string;
-  position: number;
+  status: SignupStatus;
   existing: boolean;
 };
 
-export function listPosition(rank: number, referralCount: number): number {
-  return Math.max(1, rank - referralCount);
+export function statusFor(provisionState: string | null): SignupStatus {
+  if (provisionState === "done") return "ready";
+  if (provisionState === "failed") return "problem";
+  return "preparing";
 }
 
 export function normalizeEmail(value: string): string | null {
@@ -72,10 +77,6 @@ export function normalizeRunType(value: string): RunType | null {
 export function normalizeRef(value: string): string | null {
   const ref = cleanText(value, 16).toUpperCase();
   return /^[A-Z0-9]{4,16}$/.test(ref) ? ref : null;
-}
-
-export function referralUrl(origin: string, refCode: string): string {
-  return `${origin}/wishlist?ref=${refCode}`;
 }
 
 export async function hashIp(ip: string, salt: string): Promise<string> {
@@ -109,18 +110,6 @@ export async function findByRef(db: D1Database, refCodeValue: string): Promise<W
     .first<WaitlistRow>();
 }
 
-export async function positionFor(db: D1Database, row: WaitlistRow): Promise<number> {
-  const ahead = await db
-    .prepare(
-      `SELECT COUNT(*) AS ahead
-       FROM waitlist
-       WHERE created_at < ?1 OR (created_at = ?1 AND id < ?2)`,
-    )
-    .bind(row.created_at, row.id)
-    .first<{ ahead: number }>();
-  return listPosition((ahead?.ahead ?? 0) + 1, row.referral_count);
-}
-
 async function recentAttempts(db: D1Database, ipHash: string, now: Date): Promise<number> {
   const cutoff = new Date(now.getTime() - RATE_WINDOW_MS).toISOString();
   const row = await db
@@ -131,6 +120,23 @@ async function recentAttempts(db: D1Database, ipHash: string, now: Date): Promis
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
+
+// One statement, so the cap cannot be overshot by two sign-ups racing. The
+// WHERE clause reads the same settings row the admin form writes, and the
+// second half counts only rows that actually hold a free slot. A refused
+// insert changes zero rows instead of creating an over-cap row.
+const INSERT_SQL = `
+  INSERT INTO waitlist (
+    email, discord_id, discord_username, run_type, run_detail,
+    ref_code, referred_by, ip_hash, country, created_at, provision_state
+  )
+  SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued'
+  WHERE (SELECT is_open FROM waitlist_settings WHERE id = 1) = 1
+    AND (
+      (SELECT signup_cap FROM waitlist_settings WHERE id = 1) IS NULL
+      OR (SELECT COUNT(*) FROM waitlist WHERE ${OCCUPIED_SQL})
+         < (SELECT signup_cap FROM waitlist_settings WHERE id = 1)
+    )`;
 
 export async function createSignup(
   db: D1Database,
@@ -145,6 +151,8 @@ export async function createSignup(
   const byEmail = await findByEmail(db, input.email);
   if (byEmail) return { ok: true, row: byEmail, existing: true };
 
+  // Fast, friendly failure before the insert. The insert below is what actually
+  // enforces the cap.
   const blocked = await signupBlockedReason(db);
   if (blocked) return { ok: false, error: blocked };
 
@@ -157,17 +165,10 @@ export async function createSignup(
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = refCode();
-    const statements = [
-      db
-        .prepare("INSERT INTO signup_attempts (ip_hash, created_at) VALUES (?, ?)")
-        .bind(ipHash, createdAt),
-      db
-        .prepare(
-          `INSERT INTO waitlist (
-             email, discord_id, discord_username, run_type, run_detail,
-             ref_code, referred_by, ip_hash, country, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
+    let inserted;
+    try {
+      inserted = await db
+        .prepare(INSERT_SQL)
         .bind(
           input.email,
           input.discordId,
@@ -179,21 +180,8 @@ export async function createSignup(
           ipHash,
           input.country,
           createdAt,
-        ),
-    ];
-    if (referredBy) {
-      statements.push(
-        db
-          .prepare("UPDATE waitlist SET referral_count = referral_count + 1 WHERE ref_code = ?")
-          .bind(referredBy.ref_code),
-      );
-    }
-
-    try {
-      await db.batch(statements);
-      const row = await findByRef(db, code);
-      if (!row) throw new Error("insert missing");
-      return { ok: true, row, existing: false };
+        )
+        .run();
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("waitlist.email")) {
@@ -207,21 +195,40 @@ export async function createSignup(
       if (message.includes("waitlist.ref_code")) continue;
       throw error;
     }
+
+    if ((inserted.meta.changes ?? 0) === 0) {
+      // The row was refused by the open/cap guard. Re-read the reason rather
+      // than guessing, because an admin can change it between the two reads.
+      const refused = await signupBlockedReason(db);
+      return { ok: false, error: refused ?? "full" };
+    }
+
+    const row = await findByRef(db, code);
+    if (!row) throw new Error("insert missing");
+
+    const follow: D1PreparedStatement[] = [
+      db
+        .prepare("INSERT INTO signup_attempts (ip_hash, created_at) VALUES (?, ?)")
+        .bind(ipHash, createdAt),
+    ];
+    if (referredBy) {
+      follow.push(
+        db
+          .prepare("UPDATE waitlist SET referral_count = referral_count + 1 WHERE ref_code = ?")
+          .bind(referredBy.ref_code),
+      );
+    }
+    await db.batch(follow);
+    return { ok: true, row, existing: false };
   }
   throw new Error("ref code exhausted");
 }
 
-export async function toPublic(
-  db: D1Database,
-  row: WaitlistRow,
-  origin: string,
-  existing: boolean,
-): Promise<PublicEntry> {
+export function toPublic(row: WaitlistRow, existing: boolean): PublicEntry {
   return {
     email: row.email,
     refCode: row.ref_code,
-    referralUrl: referralUrl(origin, row.ref_code),
-    position: await positionFor(db, row),
+    status: statusFor(row.provision_state),
     existing,
   };
 }

@@ -223,7 +223,7 @@ export function adminLoginPage(error: string | null): string {
   return adminLayout(
     "Admin",
     `<section class="card">
-      <h1>Waitlist admin</h1>
+      <h1>Sign-up admin</h1>
       <p class="supporting">Sign in with the Discord account listed in ADMIN_DISCORD_IDS.</p>
       ${alert}
       <p><a class="button" href="/api/auth/admin/discord">Continue with Discord</a></p>
@@ -243,6 +243,12 @@ export function adminDashboardPage(options: {
   const notice = options.notice ? `<p class="notice" role="status">${escapeHtml(options.notice)}</p>` : "";
   const error = options.error ? `<p class="alert" role="alert">${escapeHtml(options.error)}</p>` : "";
   const capValue = options.settings.signupCap === null ? "" : String(options.settings.signupCap);
+  const atCapacity =
+    options.settings.signupCap !== null &&
+    options.settings.occupiedCount >= options.settings.signupCap;
+  const capacityBadge = atCapacity
+    ? `<p class="alert" role="status">${escapeHtml(content.admin.atCapacity)}</p>`
+    : "";
   const totalPages = Math.max(1, Math.ceil(options.list.total / options.list.pageSize));
   const prev =
     options.list.page > 1
@@ -277,7 +283,9 @@ export function adminDashboardPage(options: {
         ? `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`
         : state === "done"
           ? `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`
-          : "";
+          : state === "queued"
+            ? `<div class="muted">${escapeHtml(content.admin.provisionQueued)}</div>`
+            : "";
       return `<tr>
       <td>${row.id}</td>
       <td>${escapeHtml(row.email)}</td>
@@ -310,8 +318,9 @@ export function adminDashboardPage(options: {
     </div>
     ${notice}${error}
     <section class="card" aria-labelledby="settings-heading">
-      <h1 id="settings-heading">Waitlist controls</h1>
+      <h1 id="settings-heading">Sign-up controls</h1>
       <p class="note">${options.list.total} sign-up${options.list.total === 1 ? "" : "s"} stored.</p>
+      ${capacityBadge}
       <form method="post" action="/api/admin/settings" class="admin-settings">
         <fieldset>
           <legend>Status</legend>
@@ -321,16 +330,17 @@ export function adminDashboardPage(options: {
         <div>
           <label for="signup-cap">Signup cap</label>
           <input id="signup-cap" name="signup_cap" type="number" min="0" step="1" inputmode="numeric" placeholder="No cap" value="${escapeHtml(capValue)}">
-          <p class="note">Leave blank for no cap. Current count: ${options.settings.signupCount}${
-            options.settings.signupCap === null ? "" : ` / ${options.settings.signupCap}`
-          }.</p>
+          <p class="note">Starts at 25 slots. Leave blank for no cap. ${escapeHtml(content.admin.capacityNote)}: ${
+            options.settings.occupiedCount
+          }${options.settings.signupCap === null ? "" : ` / ${options.settings.signupCap}`}.
+            ${options.list.total} row${options.list.total === 1 ? "" : "s"} stored in total. A cap of 0 takes the site out of sign-up mode.</p>
         </div>
         <button class="button" type="submit">Save</button>
       </form>
       <p class="admin-links"><a href="/api/admin/export.csv">Download CSV</a></p>
     </section>
     <section aria-labelledby="subs-heading">
-      <h2 id="subs-heading">Submissions</h2>
+      <h2 id="subs-heading">Sign-ups</h2>
       <div class="table-wrap">
         <table class="admin-table">
           <thead>
@@ -339,11 +349,11 @@ export function adminDashboardPage(options: {
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="9">No submissions yet.</td></tr>`}
+            ${rows || `<tr><td colspan="9">No sign-ups yet.</td></tr>`}
           </tbody>
         </table>
       </div>
-      <p class="note">Page ${options.list.page} of ${totalPages}. Provision creates the Calagopus account and server, then DMs and emails the user.</p>
+      <p class="note">Page ${options.list.page} of ${totalPages}. Sign-ups arrive queued; Provision creates the Calagopus account and server by hand, then DMs and emails the user. With AUTO_PROVISION set to 1, new sign-ups start on their own.</p>
       <div class="actions">${prev}${next}</div>
     </section>`,
   );

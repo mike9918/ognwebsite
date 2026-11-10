@@ -92,6 +92,14 @@ export function provisioningConfigured(env: Env): boolean {
   return provisionConfig(env) !== null && notifyConfigured(env);
 }
 
+// One switch for the two modes AUD-67 writes copy for. Staff provisioned is the
+// default: AUTO_PROVISION must be exactly "1" to start a sign-up in the
+// background. Anything else (unset, "0") keeps the admin click as the only
+// trigger, so a missing var can never create servers on its own.
+export function autoProvisionEnabled(env: Env): boolean {
+  return provisioningConfigured(env) && env.AUTO_PROVISION === "1";
+}
+
 // Calagopus usernames are 3-15 characters of letters, numbers and underscores.
 // The referral code makes the suffix unique and stays inside that budget.
 export function panelUsername(row: WaitlistRow): string {
@@ -398,7 +406,7 @@ export async function provisionEntry(
      SET provision_state = 'running', provision_started_at = ?, provision_error = NULL,
          provision_attempts = provision_attempts + 1
      WHERE id = ?
-       AND (provision_state IS NULL OR provision_state = 'failed'
+       AND (provision_state IS NULL OR provision_state IN ('queued', 'failed')
             OR (provision_state = 'running'
                 AND (provision_started_at IS NULL OR provision_started_at < ?)))`,
   )
