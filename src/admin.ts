@@ -220,17 +220,41 @@ function adminLayout(title: string, body: string): string {
 </html>`;
 }
 
-export function adminLoginPage(error: string | null): string {
-  const alert = error ? `<p class="alert" role="alert">${escapeHtml(error)}</p>` : "";
-  return adminLayout(
-    "Admin",
-    `<section class="card">
-      <h1>Sign-up admin</h1>
-      <p class="supporting">Sign in with the Discord account listed in ADMIN_DISCORD_IDS.</p>
-      ${alert}
-      <p><a class="button" href="/api/auth/admin/discord">Continue with Discord</a></p>
-    </section>`,
-  );
+// Unauthenticated /admin must not advertise an admin surface. Render the same
+// copy as the public 404; staff sign in via /api/auth/admin/discord.
+export function adminLoginPage(_error: string | null): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtml(content.notFound.title)} ${escapeHtml(content.name)}</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0d1712">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <div class="frame header-inner">
+      <a class="brand" href="/">
+        <img src="/brand/opengamenode-dark-960.png" width="960" height="320" alt="OpenGameNode">
+      </a>
+      <nav aria-label="Primary">
+        <a href="/">Home</a>
+      </nav>
+    </div>
+  </header>
+  <main id="content">
+    <div class="frame stack">
+      <h1>${escapeHtml(content.notFound.title)}</h1>
+      <p class="supporting">${escapeHtml(content.notFound.body)}</p>
+      <p><a class="button" href="/">${escapeHtml(content.notFound.home)}</a></p>
+    </div>
+  </main>
+</body>
+</html>`;
 }
 
 export function adminDashboardPage(options: {
@@ -283,7 +307,7 @@ export function adminDashboardPage(options: {
         : state === "running" && !runningStale
           ? `<button class="button button-secondary" type="button" disabled>${escapeHtml(content.admin.provisionRunning)}</button>`
           : state === "done"
-            ? `<a class="button button-secondary" href="${escapeHtml(`${options.panelUrl}/server/${row.server_uuid ?? ""}`)}">${escapeHtml(content.admin.openServer)}</a>`
+            ? `<a class="button button-secondary" href="${escapeHtml(`${options.panelUrl}/server/${row.server_uuid ?? ""}`)}" target="_blank" rel="noopener noreferrer">${escapeHtml(content.admin.openServer)}</a>`
             : provisionForm;
       let provisionNote = "";
       if (row.provision_error) {

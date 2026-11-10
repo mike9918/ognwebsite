@@ -1,6 +1,6 @@
 # OpenGameNode
 
-The public site for OpenGameNode. The homepage is `/` and carries the Discord sign-up form itself. `/signup` is the focused sign-up page; `/wishlist` is kept as an alias because the Discord OAuth callback already points at it. Admin is `/admin`.
+The public site for OpenGameNode. The homepage is `/` and carries the Discord sign-up form itself. `/signup` is the focused sign-up page; `/wishlist` is kept as an alias because the Discord OAuth callback already points at it. Admin lives behind `/admin` after Discord sign-in; unauthenticated visits look like a 404 — start at `/api/auth/admin/discord`.
 
 This is a Cloudflare Worker with static assets and a D1 database. It does not include the game panel. That will be `panel.opengamenode.com`.
 
@@ -182,7 +182,7 @@ npm run check
 | `/help` | Index of the five help guides |
 | `/help/<slug>` | `first-server`, `invite-friends`, `upload-a-world`, `backups`, `supporter-billing` |
 | `/terms`, `/privacy`, `/aup` | Legal pages rendered from `src/legal.ts` |
-| `/admin` | Discord-gated admin: sign-ups, delete, open/close, cap, Automatic/Manual mode, retry provisioning |
+| `/admin` | Discord-gated admin (404 when signed out): sign-ups, delete, open/close, cap, Automatic/Manual mode, retry provisioning |
 | `/api/auth/discord` | Discord sign-up start |
 | `/api/auth/admin/discord` | Admin Discord start |
 | `/api/admin/settings` | Save open/close, cap, and provisioning mode |
