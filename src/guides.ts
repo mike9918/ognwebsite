@@ -21,13 +21,13 @@ OpenGameNode hosts Minecraft servers for free. This guide walks through the whol
 
 ## 1. Sign up free
 
-Tap Sign up free with Discord on the [homepage](/) or the [sign-up page](/signup), pick what you're running, and sign in with your Discord account. We create your panel account from your verified Discord email, so there's nothing to fill in and no password to set up.
+Tap Sign up free with Discord on the [homepage](/) or the [sign-up page](/signup), pick what you're running, and sign in with your Discord account. We create your panel account from your verified Discord email, so there's nothing to fill in and no password to set up. We'll DM or email you when your server is ready.
 
 We ask for Discord so each person gets one account. We never post or send DMs on your behalf, and we only read your Discord ID, username and verified email.
 
 ## 2. Sign in to the panel
 
-Go to panel.opengamenode.com and sign in with Discord. The panel is where you start your server, see your address and manage your files.
+When your server is ready, go to panel.opengamenode.com and sign in with Discord. The panel is where you start your server, see your address and manage your files.
 
 You're signed out after about an hour of inactivity. Your servers keep running while you're signed out.
 

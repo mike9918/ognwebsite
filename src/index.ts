@@ -45,11 +45,10 @@ import { aupBody, privacyBody, termsBody } from "./legal";
 import { provisionConfig, provisionEntry, provisioningConfigured } from "./provision";
 import { sweepSignups } from "./sweep";
 
-function emptyValues(ref: string): FormValues {
+function emptyValues(): FormValues {
   return {
     runType: "",
     runDetail: "",
-    ref,
   };
 }
 
@@ -137,7 +136,6 @@ async function handleDiscordStart(request: Request, env: Env): Promise<Response>
   const result = await beginDiscord(request, env, {
     runType: read("run_type"),
     runDetail: cleanText(read("run_detail"), 120),
-    ref: read("ref"),
     token: typeof token === "string" ? token : "",
   });
   if ("error" in result) {
@@ -203,15 +201,17 @@ function knownWishlistError(code: string): string | null {
 }
 
 async function homeGet(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
   const draft = await readPendingSignup(request, env);
-  const blocked = await signupBlockedReason(env.DB);
+  const [blocked, settings] = await Promise.all([
+    signupBlockedReason(env.DB),
+    getSettings(env.DB),
+  ]);
   const view: WishlistView = {
     discordEnabled: discordConfigured(env),
     capacity: (blocked ?? "open") as Capacity,
+    autoProvision: settings.autoProvision,
     siteKey: env.TURNSTILE_SITE_KEY,
-    values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
+    values: draft ? { runType: draft.runType, runDetail: draft.runDetail } : emptyValues(),
     error: null,
     success: null,
   };
@@ -221,19 +221,22 @@ async function homeGet(request: Request, env: Env): Promise<Response> {
 async function wishlistGet(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const welcome = normalizeRef(url.searchParams.get("welcome") ?? "");
-  const ref = normalizeRef(url.searchParams.get("ref") ?? "") ?? "";
   const errorCode = url.searchParams.get("error") ?? "";
   const error = knownWishlistError(errorCode);
   const draft = await readPendingSignup(request, env);
-  const blocked = await signupBlockedReason(env.DB);
+  const [blocked, settings] = await Promise.all([
+    signupBlockedReason(env.DB),
+    getSettings(env.DB),
+  ]);
   if (welcome) {
     const row = await findByRef(env.DB, welcome);
     if (row) {
       return renderWishlist(request, env, {
         discordEnabled: false,
         capacity: "open",
+        autoProvision: settings.autoProvision,
         siteKey: "",
-        values: emptyValues(""),
+        values: emptyValues(),
         error: null,
         success: { ...toPublic(row, false), discordInviteUrl: inviteUrl(env) },
       }, 200);
@@ -242,8 +245,9 @@ async function wishlistGet(request: Request, env: Env): Promise<Response> {
   return renderWishlist(request, env, {
     discordEnabled: discordConfigured(env),
     capacity: (blocked ?? "open") as Capacity,
+    autoProvision: settings.autoProvision,
     siteKey: env.TURNSTILE_SITE_KEY,
-    values: draft ? { runType: draft.runType, runDetail: draft.runDetail, ref: ref || draft.ref } : emptyValues(ref),
+    values: draft ? { runType: draft.runType, runDetail: draft.runDetail } : emptyValues(),
     error,
     success: null,
   }, 200);
@@ -326,6 +330,7 @@ async function handleAdminSettings(request: Request, env: Env): Promise<Response
   await updateSettings(env.DB, {
     isOpen: parsed.isOpen,
     signupCap: parsed.signupCap,
+    autoProvision: parsed.autoProvision,
     now: new Date(),
   });
   return redirect("/admin?saved=1", 303);
@@ -391,11 +396,6 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         return redirect(`${url.pathname}${url.search}`, 301);
       }
 
-      if (method === "GET" && url.pathname === "/" && url.searchParams.has("ref")) {
-        url.pathname = "/wishlist";
-        return redirect(`${url.pathname}${url.search}`, 302);
-      }
-
       if (method === "POST" && url.pathname === "/api/auth/discord") return handleDiscordStart(request, env);
       if (method === "GET" && url.pathname === "/api/auth/discord/callback") {
         return handleDiscordCallback(request, env, ctx);
@@ -437,8 +437,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
       if (method === "GET" || method === "HEAD") {
         if (url.pathname === "/") return homeGet(request, env);
-        // /signup is the link the site now uses; /wishlist stays for the OAuth
-        // callback and every referral link already shared.
+        // /signup is the public link; /wishlist stays for the OAuth callback.
         if (url.pathname === "/wishlist" || url.pathname === "/signup") {
           return wishlistGet(request, env);
         }

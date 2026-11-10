@@ -18,7 +18,7 @@ export const content = {
   },
   home: {
     lead:
-      "Free, ad-supported hosting with a four-hour session, a simple panel and no ad before you press Start. Sign up free with Discord and your server is waiting in the panel.",
+      "Free, ad-supported hosting with a four-hour session, a simple panel and no ad before you press Start. Sign up free with Discord — we'll set up your server and tell you when it's ready.",
     primaryAction: "Sign up free with Discord",
     secondaryAction: "Sign in to the panel",
     signupHeading: "Sign up free",
@@ -31,7 +31,7 @@ export const content = {
       },
       {
         title: "Pick what you're running",
-        body: "Choose vanilla, plugins on Paper, or a modpack. Your server is created for you, stopped, and waiting in the panel.",
+        body: "Choose vanilla, plugins on Paper, or a modpack. We create your server stopped and ready in the panel after sign-up.",
       },
       {
         title: "Invite your friends",
@@ -99,7 +99,7 @@ export const content = {
     {
       question: "How do I sign up?",
       answer:
-        "Tap Sign up free with Discord on the homepage, pick what you're running, and sign in with Discord. We create your panel account from your verified Discord email, so there's no form to fill in and no password to set up. You can start your server from the panel right away.",
+        "Tap Sign up free with Discord on the homepage, pick what you're running, and sign in with Discord. We create your panel account from your verified Discord email, so there's no form to fill in and no password to set up. We'll DM or email you when your server is ready to Start in the panel.",
     },
     {
       question: "How long does my server run?",
@@ -203,12 +203,15 @@ export const content = {
   },
   // The sign-up screen becomes a status page once a row exists. "preparing" is
   // a server that is queued or being created, "ready" is a finished provision,
-  // and "problem" is a failure the admin table can retry.
+  // and "problem" is a failure the admin table can retry. Preparing copy depends
+  // on Automatic vs Manual provisioning (AUD-66 / AUD-67).
   success: {
     heading: "You're signed up.",
     existing: "You already have an account with this Discord, so we've kept it.",
-    preparing:
-      "Your sign-up is confirmed and we're setting up your server now. We'll DM or email you as soon as it's ready — this page updates too.",
+    preparingAutomatic:
+      "Your sign-up is confirmed and we're setting up your server now. We'll DM or email you as soon as it's ready.",
+    preparingManual:
+      "Thanks — we've got your Discord account. We'll notify you by Discord DM and email when your server is ready to Start.",
     ready: "Your server is ready. Open the panel and press Start when you want to play.",
     problem:
       "Your sign-up is saved, but we hit a problem creating your server. Our team can see it and retry. Ask in our Discord if you'd like an update.",
@@ -240,7 +243,7 @@ export const content = {
   capacity: {
     heading: "At capacity right now",
     body:
-      "New sign-ups are paused while we free up room. Spots reopen as servers go quiet, so check back soon. You can still say hello in our Discord.",
+      "OpenGameNode isn't taking new free sign-ups at the moment. Please check back soon — the sign-up button will return when there's room again. You can still say hello in our Discord.",
     discord: "Join the Discord",
   },
   admin: {
@@ -252,6 +255,7 @@ export const content = {
     provisionRetry: "Retry provision",
     provisionRunning: "Provisioning…",
     provisionQueued: "Setting up…",
+    provisionPending: "Waiting for Provision",
     provisionedLabel: "Provisioned",
     openServer: "Open server",
     provisioned: "Provisioned: panel account, server and notifications are done.",
@@ -263,18 +267,26 @@ export const content = {
     unavailable: "Admin sign-in isn't configured yet.",
     atCapacity: "At capacity",
     capacityNote: "Free slots used",
+    modeManual: "Manual — staff click Provision",
+    modeAutomatic: "Automatic — provision after sign-up",
+    modeNote:
+      "Cap applies in both modes. Automatic needs panel and mail settings; otherwise rows stay queued until you provision by hand.",
+    tableNoteManual:
+      "Sign-ups arrive queued. Provision creates the Calagopus account and server, then DMs and emails the user.",
+    tableNoteAutomatic:
+      "Automatic mode starts provisioning after Discord sign-up. Provision stays available as a retry path.",
   },
   provision: {
     dmIntro: "Your OpenGameNode server is ready.",
     dmNote: "You signed up as {email}. Sign in with that address and press Start when you want to play.",
     dmNoteDiscord:
-      "Sign in at {panel} with Discord — your account is already linked, so there's no password to set up. Press Start when you want to play.",
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to set up. Press Start when you want to play. A server only queues if 4 others are already starting or the node is full.",
     emailSubject: "Your OpenGameNode server is ready",
     emailIntro: "Your server is ready.",
     emailNote:
       "You signed up as {email}. If you don't have a panel password yet, use “Forgot password” on the panel sign-in page.",
     emailNoteDiscord:
-      "Sign in at {panel} with Discord — your account is already linked, so there's no password to remember. If you'd rather use an email password, choose “Forgot password”.",
+      "Sign in at {panel} with Discord — your account is already linked, so there's no password to remember. If you'd rather use an email password, choose “Forgot password”. A server only queues if 4 others are already starting or the node is full.",
     labels: {
       server: "Server",
       plan: "Plan",
@@ -293,7 +305,7 @@ export const content = {
       email: "Email",
       plan: "Plan",
       wants: "Wants",
-      ref: "Ref",
+      ref: "Code",
       joined: "Joined",
       server: "Server",
       panelUser: "Panel user",

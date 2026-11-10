@@ -41,10 +41,6 @@ CALAGOPUS_EGG_MODPACK=
 CALAGOPUS_NODE_UUID=
 CALAGOPUS_LOCATION_UUIDS=
 
-# Unset means staff provision each sign-up by hand from /admin. Set it to "1"
-# to provision new sign-ups in the background instead.
-AUTO_PROVISION=0
-
 # Email for the "server is ready" notice. Microsoft 365 / Exchange Online is
 # used when its app credentials are set; otherwise Resend is used.
 # Graph needs an Entra app registration with the Mail.Send APPLICATION

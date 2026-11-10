@@ -11,6 +11,7 @@ import { content, type RunType } from "./content";
 import { cleanText } from "./http";
 import { notifyConfigured, sendDiscordReady, sendReadyEmail } from "./notify";
 import { planFor, type ServerPlan } from "./plans";
+import { getSettings } from "./settings";
 import type { WaitlistRow } from "./signup";
 
 const STALE_CLAIM_MS = 5 * 60 * 1000;
@@ -92,16 +93,17 @@ export function provisioningConfigured(env: Env): boolean {
   return provisionConfig(env) !== null && notifyConfigured(env);
 }
 
-// One switch for the two modes AUD-67 writes copy for. Staff provisioned is the
-// default: AUTO_PROVISION must be exactly "1" to start a sign-up in the
-// background. Anything else (unset, "0") keeps the admin click as the only
-// trigger, so a missing var can never create servers on its own.
-export function autoProvisionEnabled(env: Env): boolean {
-  return provisioningConfigured(env) && env.AUTO_PROVISION === "1";
+// Automatic vs Manual comes from Admin → Sign-up controls. Default is Manual so
+// a missing setting can never create servers on its own. Panel/mail config must
+// still be present before either mode can provision.
+export async function autoProvisionEnabled(env: Env): Promise<boolean> {
+  if (!provisioningConfigured(env)) return false;
+  const settings = await getSettings(env.DB);
+  return settings.autoProvision;
 }
 
 // Calagopus usernames are 3-15 characters of letters, numbers and underscores.
-// The referral code makes the suffix unique and stays inside that budget.
+// The signup code makes the suffix unique and stays inside that budget.
 export function panelUsername(row: WaitlistRow): string {
   const base = (row.discord_username ?? "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 6);
   const suffix = (row.ref_code ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);

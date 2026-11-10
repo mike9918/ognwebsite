@@ -21,7 +21,6 @@ import { signupBlockedReason } from "./settings";
 import {
   createSignup,
   normalizeEmail,
-  normalizeRef,
   normalizeRunType,
   toPublic,
   type PublicEntry,
@@ -35,7 +34,6 @@ const PENDING_MAX_AGE = 10 * 60;
 type PendingSignup = {
   runType: string;
   runDetail: string;
-  ref: string;
   state: string;
   expiresAt: number;
 };
@@ -65,7 +63,7 @@ export async function readPendingSignup(request: Request, env: Env): Promise<Pen
     const draft = JSON.parse(payload) as PendingSignup;
     if (!Number.isFinite(draft.expiresAt) || draft.expiresAt <= Date.now() ||
         !normalizeRunType(draft.runType) || typeof draft.runDetail !== "string" ||
-        typeof draft.ref !== "string" || typeof draft.state !== "string") return null;
+        typeof draft.state !== "string") return null;
     return draft;
   } catch { return null; }
 }
@@ -76,7 +74,6 @@ export async function beginDiscord(
   fields: {
     runType: string;
     runDetail: string;
-    ref: string;
     token: string;
   },
 ): Promise<{ location: string; cookies: string[] } | { error: DiscordAuthError }> {
@@ -91,7 +88,6 @@ export async function beginDiscord(
   const pending: PendingSignup = {
     runType,
     runDetail: fields.runDetail,
-    ref: normalizeRef(fields.ref) ?? "",
     state,
     expiresAt: Date.now() + PENDING_MAX_AGE * 1000,
   };
@@ -223,7 +219,6 @@ export async function finishDiscord(
       discordUsername: username || null,
       runType,
       runDetail: detail || null,
-      ref: pending.ref ? normalizeRef(pending.ref) : null,
       ip: clientIp(request),
       country: clientCountry(request),
       salt: env.IP_HASH_SALT,
@@ -237,10 +232,10 @@ export async function finishDiscord(
     // the message that entry already has. A row with no card yet (created
     // before this feature, or deleted in Discord) gets one on the next signup.
     if (!created.row.discord_message_id) await postWaitlistCard(env, env.DB, created.row);
-    // Open sign-ups provision immediately, after the redirect is sent so the
-    // person never waits on the panel. A crash or a slow Calagopus call leaves
-    // the row queued, which the cron sweep retries.
-    if (!created.existing && ctx && autoProvisionEnabled(env)) {
+    // Automatic mode provisions after the redirect so the person never waits on
+    // the panel. A crash or a slow Calagopus call leaves the row queued, which
+    // the cron sweep retries. Manual mode waits for the admin Provision click.
+    if (!created.existing && ctx && (await autoProvisionEnabled(env))) {
       ctx.waitUntil(
         provisionEntry(env, created.row.id).catch((error: unknown) => {
           console.error(

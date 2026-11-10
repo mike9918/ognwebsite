@@ -9,8 +9,6 @@ export default defineConfig(async () => ({
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations("./migrations"),
           MIN_DISCORD_ACCOUNT_AGE_DAYS: "30",
-          // Manual mode in tests: a sign-up must not reach the fake panel host.
-          AUTO_PROVISION: "0",
           TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
           TURNSTILE_SECRET: "1x0000000000000000000000000000000AA",
           TURNSTILE_HOSTNAMES: "example.com",

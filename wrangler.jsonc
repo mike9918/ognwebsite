@@ -46,9 +46,8 @@
   "keep_vars": true,
   "vars": {
     "MIN_DISCORD_ACCOUNT_AGE_DAYS": "30",
-    // AUTO_PROVISION is deliberately not set here: staff provision sign-ups by
-    // hand from /admin. Set it to "1" in the dashboard to provision each new
-    // sign-up in the background; keep_vars keeps that value across deploys.
+    // Automatic vs Manual provisioning is an admin setting in D1
+    // (waitlist_settings.auto_provision), not a Wrangler var.
     // The panel's Discord OAuth provider UUID, from Admin -> OAuth Providers
     // (also listed by GET /api/auth/oauth). Provisioning links each panel user
     // to their Discord id so their first sign-in lands in that account. Remove

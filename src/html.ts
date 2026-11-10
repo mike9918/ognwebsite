@@ -7,7 +7,6 @@ import type { PublicEntry } from "./signup";
 export type FormValues = {
   runType: string;
   runDetail: string;
-  ref: string;
 };
 
 // "open" shows the form, "full" swaps it for the at-capacity message, "closed"
@@ -17,6 +16,8 @@ export type Capacity = "open" | "full" | "closed";
 export type WishlistView = {
   discordEnabled: boolean;
   capacity: Capacity;
+  // Drives preparing copy on the success screen (Automatic vs Manual).
+  autoProvision: boolean;
   siteKey: string;
   values: FormValues;
   error: string | null;
@@ -156,17 +157,23 @@ function fieldError(error: string | null): string {
   return `<p id="form-alert" class="alert" role="alert">${escapeHtml(error)}</p>`;
 }
 
-function successBlock(entry: PublicEntry & { discordInviteUrl: string | null }): string {
+function successBlock(
+  entry: PublicEntry & { discordInviteUrl: string | null },
+  autoProvision: boolean,
+): string {
   const discord = entry.discordInviteUrl
     ? `<p><a class="button button-secondary" href="${escapeHtml(entry.discordInviteUrl)}">${escapeHtml(content.success.discord)}</a></p>`
     : "";
   const existing = entry.existing ? `<p>${escapeHtml(content.success.existing)}</p>` : "";
+  const preparing = autoProvision
+    ? content.success.preparingAutomatic
+    : content.success.preparingManual;
   const status =
     entry.status === "ready"
       ? content.success.ready
       : entry.status === "problem"
         ? content.success.problem
-        : content.success.preparing;
+        : preparing;
   // Only a finished provisioning has a server to open. A queued person still
   // gets their email note so they know where the update will arrive.
   const panel =
@@ -222,7 +229,6 @@ function waitlistForm(view: WishlistView): string {
             <label for="run-detail">${escapeHtml(content.form.detailLabel)}</label>
             <input id="run-detail" name="run_detail" type="text" maxlength="120" value="${escapeHtml(view.values.runDetail)}">
           </div>
-          <input type="hidden" name="ref" value="${escapeHtml(view.values.ref)}">
           ${turnstile}
           <div class="actions">
             <button class="button" type="submit" data-discord-submit disabled>${escapeHtml(content.form.discordButton)}</button>
@@ -282,7 +288,7 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
           <p class="note">${escapeHtml(content.minecraftNote)}</p>
         </div>
         <div class="hero-side">
-          ${view.success ? successBlock(view.success) : waitlistCard(view, content.home.signupHeading, inviteUrl)}
+          ${view.success ? successBlock(view.success, view.autoProvision) : waitlistCard(view, content.home.signupHeading, inviteUrl)}
           <p class="note side-note">
             Prefer the panel? <a href="${content.panelUrl}" rel="noopener">${escapeHtml(content.nav.panel)}</a>
           </p>
@@ -381,8 +387,8 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
 }
 
 export function wishlistPage(view: WishlistView, inviteUrl: string | null): string {
-  // /signup is an alias of this page, so the canonical stays on /wishlist where
-  // the OAuth callback and shared referral links already point.
+  // /signup is an alias of this page; /wishlist stays canonical because the
+  // Discord OAuth callback already points there.
   if (view.success) {
     return layout({
       title: `${content.success.heading} ${content.name}`,
@@ -390,7 +396,7 @@ export function wishlistPage(view: WishlistView, inviteUrl: string | null): stri
       path: "/wishlist",
       current: "wishlist",
       inviteUrl,
-      main: `<div class="frame stack">${successBlock(view.success)}</div>`,
+      main: `<div class="frame stack">${successBlock(view.success, view.autoProvision)}</div>`,
     });
   }
 

@@ -284,7 +284,11 @@ export function adminDashboardPage(options: {
         : state === "done"
           ? `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`
           : state === "queued"
-            ? `<div class="muted">${escapeHtml(content.admin.provisionQueued)}</div>`
+            ? `<div class="muted">${escapeHtml(
+                options.settings.autoProvision
+                  ? content.admin.provisionQueued
+                  : content.admin.provisionPending,
+              )}</div>`
             : "";
       return `<tr>
       <td>${row.id}</td>
@@ -292,7 +296,6 @@ export function adminDashboardPage(options: {
       <td>${escapeHtml(row.discord_username ?? "")}<div class="muted">${escapeHtml(row.discord_id ?? "")}</div></td>
       <td>${escapeHtml(row.run_type)}${row.run_detail ? `<div class="muted">${escapeHtml(row.run_detail)}</div>` : ""}</td>
       <td>${escapeHtml(row.ref_code)}</td>
-      <td>${row.referral_count}</td>
       <td>${escapeHtml(row.country ?? "")}</td>
       <td>${escapeHtml(row.created_at)}</td>
       <td>
@@ -327,6 +330,12 @@ export function adminDashboardPage(options: {
           <label class="choice"><input type="radio" name="is_open" value="1"${options.settings.isOpen ? " checked" : ""}> <span>Open</span></label>
           <label class="choice"><input type="radio" name="is_open" value="0"${options.settings.isOpen ? "" : " checked"}> <span>Closed</span></label>
         </fieldset>
+        <fieldset>
+          <legend>Provisioning</legend>
+          <label class="choice"><input type="radio" name="auto_provision" value="0"${options.settings.autoProvision ? "" : " checked"}> <span>${escapeHtml(content.admin.modeManual)}</span></label>
+          <label class="choice"><input type="radio" name="auto_provision" value="1"${options.settings.autoProvision ? " checked" : ""}> <span>${escapeHtml(content.admin.modeAutomatic)}</span></label>
+          <p class="note">${escapeHtml(content.admin.modeNote)}</p>
+        </fieldset>
         <div>
           <label for="signup-cap">Signup cap</label>
           <input id="signup-cap" name="signup_cap" type="number" min="0" step="1" inputmode="numeric" placeholder="No cap" value="${escapeHtml(capValue)}">
@@ -345,15 +354,19 @@ export function adminDashboardPage(options: {
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Ref</th><th>Referrals</th><th>Country</th><th>Created</th><th>Actions</th>
+              <th>ID</th><th>Email</th><th>Discord</th><th>Run</th><th>Code</th><th>Country</th><th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="9">No sign-ups yet.</td></tr>`}
+            ${rows || `<tr><td colspan="8">No sign-ups yet.</td></tr>`}
           </tbody>
         </table>
       </div>
-      <p class="note">Page ${options.list.page} of ${totalPages}. Sign-ups arrive queued; Provision creates the Calagopus account and server by hand, then DMs and emails the user. With AUTO_PROVISION set to 1, new sign-ups start on their own.</p>
+      <p class="note">Page ${options.list.page} of ${totalPages}. ${escapeHtml(
+        options.settings.autoProvision
+          ? content.admin.tableNoteAutomatic
+          : content.admin.tableNoteManual,
+      )}</p>
       <div class="actions">${prev}${next}</div>
     </section>`,
   );
@@ -361,15 +374,28 @@ export function adminDashboardPage(options: {
 
 export async function parseSettingsForm(
   form: FormData,
-): Promise<{ ok: true; isOpen: boolean; signupCap: number | null } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; isOpen: boolean; signupCap: number | null; autoProvision: boolean }
+  | { ok: false; message: string }
+> {
   const openRaw = form.get("is_open");
   if (openRaw !== "0" && openRaw !== "1") {
     return { ok: false, message: "Choose open or closed." };
   }
+  const modeRaw = form.get("auto_provision");
+  if (modeRaw !== "0" && modeRaw !== "1") {
+    return { ok: false, message: "Choose Automatic or Manual provisioning." };
+  }
   const capRaw = typeof form.get("signup_cap") === "string" ? String(form.get("signup_cap")).trim() : "";
-  if (capRaw === "") return { ok: true, isOpen: openRaw === "1", signupCap: null };
-  if (!/^\d+$/.test(capRaw)) return { ok: false, message: "Cap must be a whole number or blank." };
-  return { ok: true, isOpen: openRaw === "1", signupCap: Number(capRaw) };
+  if (capRaw !== "" && !/^\d+$/.test(capRaw)) {
+    return { ok: false, message: "Cap must be a whole number or blank." };
+  }
+  return {
+    ok: true,
+    isOpen: openRaw === "1",
+    signupCap: capRaw === "" ? null : Number(capRaw),
+    autoProvision: modeRaw === "1",
+  };
 }
 
 export { getSettings, updateSettings };

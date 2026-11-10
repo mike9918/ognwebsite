@@ -11,7 +11,7 @@ const PER_RUN = 2;
 export async function sweepSignups(env: Env, now = new Date()): Promise<number> {
   // Without panel settings, or with automatic mode switched off, there is
   // nothing to retry: the admin button is the only path.
-  if (!autoProvisionEnabled(env)) return 0;
+  if (!(await autoProvisionEnabled(env))) return 0;
 
   const graceBefore = new Date(now.getTime() - QUEUE_GRACE_MS).toISOString();
   const { results } = await env.DB.prepare(

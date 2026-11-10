@@ -40,7 +40,6 @@ export type SignupInput = {
   discordUsername: string | null;
   runType: RunType;
   runDetail: string | null;
-  ref: string | null;
   ip: string;
   country: string | null;
   salt: string;
@@ -128,9 +127,9 @@ async function recentAttempts(db: D1Database, ipHash: string, now: Date): Promis
 const INSERT_SQL = `
   INSERT INTO waitlist (
     email, discord_id, discord_username, run_type, run_detail,
-    ref_code, referred_by, ip_hash, country, created_at, provision_state
+    ref_code, ip_hash, country, created_at, provision_state
   )
-  SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued'
+  SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued'
   WHERE (SELECT is_open FROM waitlist_settings WHERE id = 1) = 1
     AND (
       (SELECT signup_cap FROM waitlist_settings WHERE id = 1) IS NULL
@@ -160,7 +159,6 @@ export async function createSignup(
     return { ok: false, error: "rate" };
   }
 
-  const referredBy = input.ref ? await findByRef(db, input.ref) : null;
   const createdAt = input.now.toISOString();
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -176,7 +174,6 @@ export async function createSignup(
           input.runType,
           input.runDetail,
           code,
-          referredBy ? referredBy.ref_code : null,
           ipHash,
           input.country,
           createdAt,
@@ -206,19 +203,10 @@ export async function createSignup(
     const row = await findByRef(db, code);
     if (!row) throw new Error("insert missing");
 
-    const follow: D1PreparedStatement[] = [
-      db
-        .prepare("INSERT INTO signup_attempts (ip_hash, created_at) VALUES (?, ?)")
-        .bind(ipHash, createdAt),
-    ];
-    if (referredBy) {
-      follow.push(
-        db
-          .prepare("UPDATE waitlist SET referral_count = referral_count + 1 WHERE ref_code = ?")
-          .bind(referredBy.ref_code),
-      );
-    }
-    await db.batch(follow);
+    await db
+      .prepare("INSERT INTO signup_attempts (ip_hash, created_at) VALUES (?, ?)")
+      .bind(ipHash, createdAt)
+      .run();
     return { ok: true, row, existing: false };
   }
   throw new Error("ref code exhausted");
