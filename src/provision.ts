@@ -14,8 +14,20 @@ import { planFor, type ServerPlan } from "./plans";
 import { getSettings } from "./settings";
 import type { WaitlistRow } from "./signup";
 
-const STALE_CLAIM_MS = 5 * 60 * 1000;
+// A claim older than this is treated as abandoned (waitUntil crash, hung panel).
+// Sweep and the admin Retry control use the same window as the claim UPDATE.
+export const STALE_CLAIM_MS = 5 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function claimIsStale(
+  startedAt: string | null | undefined,
+  now = new Date(),
+): boolean {
+  if (!startedAt) return true;
+  const started = Date.parse(startedAt);
+  if (!Number.isFinite(started)) return true;
+  return started < now.getTime() - STALE_CLAIM_MS;
+}
 
 export type ProvisionConfig = {
   baseUrl: string;

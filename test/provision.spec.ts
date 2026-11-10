@@ -1,7 +1,8 @@
 import { applyD1Migrations, type D1Migration } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { panelNames } from "../src/provision";
+import { claimIsStale, panelNames, STALE_CLAIM_MS } from "../src/provision";
+import { sweepSignups } from "../src/sweep";
 import type { WaitlistRow } from "../src/signup";
 
 type TestEnv = Env & { TEST_MIGRATIONS: D1Migration[] };
@@ -442,5 +443,71 @@ describe("provisioning", () => {
     expect(cardUpdates[0]).toContain(`/server/${SERVER_UUID}`);
     // The card still carries the entry's original details.
     expect(cardUpdates[0]).toContain("ada@example.com");
+  });
+
+  it("sweeps a stale running claim left by a crashed waitUntil", async () => {
+    const id = await insertEntry("vanilla");
+    const staleAt = new Date(Date.now() - STALE_CLAIM_MS - 1_000).toISOString();
+    await env.DB.prepare(
+      `UPDATE waitlist
+       SET provision_state = 'running', provision_started_at = ?, provision_attempts = 1
+       WHERE id = ?`,
+    )
+      .bind(staleAt, id)
+      .run();
+    await env.DB.prepare("UPDATE waitlist_settings SET auto_provision = 1 WHERE id = 1").run();
+
+    expect(claimIsStale(staleAt)).toBe(true);
+    const done = await sweepSignups(env);
+    expect(done).toBe(1);
+
+    const row = await env.DB.prepare(
+      "SELECT provision_state, server_uuid FROM waitlist WHERE id = ?",
+    )
+      .bind(id)
+      .first<{ provision_state: string; server_uuid: string | null }>();
+    expect(row).toEqual({ provision_state: "done", server_uuid: SERVER_UUID });
+    expect(createdUsers).toHaveLength(1);
+    expect(serverDeployCalls).toBe(1);
+  });
+
+  it("leaves a fresh running claim alone and offers admin Retry once stale", async () => {
+    const id = await insertEntry("vanilla");
+    const freshAt = new Date().toISOString();
+    await env.DB.prepare(
+      `UPDATE waitlist
+       SET provision_state = 'running', provision_started_at = ?, provision_attempts = 1
+       WHERE id = ?`,
+    )
+      .bind(freshAt, id)
+      .run();
+    await env.DB.prepare("UPDATE waitlist_settings SET auto_provision = 1 WHERE id = 1").run();
+
+    expect(await sweepSignups(env)).toBe(0);
+    expect(createdUsers).toHaveLength(0);
+
+    const cookie = await adminCookie();
+    const freshPage = await (
+      await exports.default.fetch(
+        new Request("https://opengamenode.com/admin", { headers: { Cookie: cookie } }),
+      )
+    ).text();
+    expect(freshPage).toContain("Provisioning…");
+    expect(freshPage).not.toContain("Stuck provisioning");
+
+    const staleAt = new Date(Date.now() - STALE_CLAIM_MS - 1_000).toISOString();
+    await env.DB.prepare(
+      "UPDATE waitlist SET provision_started_at = ? WHERE id = ?",
+    )
+      .bind(staleAt, id)
+      .run();
+
+    const stalePage = await (
+      await exports.default.fetch(
+        new Request("https://opengamenode.com/admin", { headers: { Cookie: cookie } }),
+      )
+    ).text();
+    expect(stalePage).toContain("Stuck provisioning — safe to retry");
+    expect(stalePage).toContain("Retry provision");
   });
 });

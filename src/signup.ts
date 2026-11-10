@@ -22,6 +22,8 @@ export type WaitlistRow = {
   invited_at: string | null;
   wave: number | null;
   provision_state: string | null;
+  provision_started_at: string | null;
+  provision_attempts: number;
   provision_error: string | null;
   server_uuid: string | null;
   server_name: string | null;

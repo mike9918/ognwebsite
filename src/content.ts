@@ -256,6 +256,7 @@ export const content = {
     provisionRunning: "Provisioning…",
     provisionQueued: "Setting up…",
     provisionPending: "Waiting for Provision",
+    provisionStale: "Stuck provisioning — safe to retry",
     provisionedLabel: "Provisioned",
     openServer: "Open server",
     provisioned: "Provisioned: panel account, server and notifications are done.",

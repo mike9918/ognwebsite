@@ -8,6 +8,7 @@ import {
   secretsMatch,
   setCookie,
 } from "./http";
+import { claimIsStale } from "./provision";
 import { getSettings, updateSettings, type WaitlistSettings } from "./settings";
 import { randomToken, signPayload, unsignPayload } from "./signed";
 import type { WaitlistRow } from "./signup";
@@ -156,7 +157,8 @@ export async function listSubmissions(
       .prepare(
         `SELECT id, email, discord_id, discord_username, run_type, run_detail, ref_code, referred_by,
                 referral_count, ip_hash, country, created_at, invited_at, wave,
-                provision_state, provision_error, server_uuid, server_name, provisioned_at,
+                provision_state, provision_started_at, provision_attempts, provision_error,
+                server_uuid, server_name, provisioned_at,
                 calagopus_user_uuid, discord_dm_consent_at, dm_sent_at, email_sent_at
          FROM waitlist
          ORDER BY created_at DESC, id DESC
@@ -265,31 +267,40 @@ export function adminDashboardPage(options: {
           ? `<input type="hidden" name="page" value="${options.list.page}">`
           : "";
       const state = row.provision_state ?? "";
+      // A crashed waitUntil leaves the row `running`. After the stale window the
+      // claim is reclaimable — show Retry instead of a permanent disabled button.
+      const runningStale = state === "running" && claimIsStale(row.provision_started_at);
+      const canRetry = state === "failed" || runningStale;
       const provisionForm = `<form method="post" action="/api/admin/entries/provision" class="inline-form" data-confirm-provision>
             <input type="hidden" name="id" value="${row.id}">
             ${pageField}
             <button class="button" type="submit">${escapeHtml(
-              state === "failed" ? content.admin.provisionRetry : content.admin.provision,
+              canRetry ? content.admin.provisionRetry : content.admin.provision,
             )}</button>
           </form>`;
       const provisionAction = !options.provisioningEnabled
         ? `<button class="button button-secondary" type="button" disabled title="${escapeHtml(content.admin.provisionUnavailable)}">${escapeHtml(content.admin.provision)}</button>`
-        : state === "running"
+        : state === "running" && !runningStale
           ? `<button class="button button-secondary" type="button" disabled>${escapeHtml(content.admin.provisionRunning)}</button>`
           : state === "done"
             ? `<a class="button button-secondary" href="${escapeHtml(`${options.panelUrl}/server/${row.server_uuid ?? ""}`)}">${escapeHtml(content.admin.openServer)}</a>`
             : provisionForm;
-      const provisionNote = row.provision_error
-        ? `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`
-        : state === "done"
-          ? `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`
-          : state === "queued"
-            ? `<div class="muted">${escapeHtml(
-                options.settings.autoProvision
-                  ? content.admin.provisionQueued
-                  : content.admin.provisionPending,
-              )}</div>`
-            : "";
+      let provisionNote = "";
+      if (row.provision_error) {
+        provisionNote = `<div class="muted">${escapeHtml(row.provision_error.slice(0, 180))}</div>`;
+      } else if (state === "done") {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionedLabel)}${row.provisioned_at ? ` · ${escapeHtml(row.provisioned_at.slice(0, 10))}` : ""}</div>`;
+      } else if (runningStale) {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionStale)}</div>`;
+      } else if (state === "queued") {
+        provisionNote = `<div class="muted">${escapeHtml(
+          options.settings.autoProvision
+            ? content.admin.provisionQueued
+            : content.admin.provisionPending,
+        )}</div>`;
+      } else if (state === "running") {
+        provisionNote = `<div class="muted">${escapeHtml(content.admin.provisionRunning)}</div>`;
+      }
       return `<tr>
       <td>${row.id}</td>
       <td>${escapeHtml(row.email)}</td>

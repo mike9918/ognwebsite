@@ -1,9 +1,14 @@
-import { autoProvisionEnabled, provisionEntry } from "./provision";
+import {
+  STALE_CLAIM_MS,
+  autoProvisionEnabled,
+  provisionEntry,
+} from "./provision";
 
 // Inline provisioning runs from the OAuth callback through ctx.waitUntil. That
-// is one request's budget, so a slow panel or a crash can leave a person queued
-// with no server. The scheduled handler picks those up, plus a bounded number
-// of failures, using the same stale-claim guard as the admin button.
+// is one request's budget, so a slow panel or a crash can leave a person with
+// no finished server. The scheduled handler picks those up — including stale
+// `running` claims after a crash mid-provision — plus a bounded number of
+// failures, using the same stale-claim guard as the admin button.
 const QUEUE_GRACE_MS = 60 * 1000;
 const MAX_ATTEMPTS = 3;
 const PER_RUN = 2;
@@ -14,15 +19,24 @@ export async function sweepSignups(env: Env, now = new Date()): Promise<number> 
   if (!(await autoProvisionEnabled(env))) return 0;
 
   const graceBefore = new Date(now.getTime() - QUEUE_GRACE_MS).toISOString();
+  const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS).toISOString();
   const { results } = await env.DB.prepare(
     `SELECT id FROM waitlist
-     WHERE provision_state IN ('queued', 'failed')
-       AND provision_attempts < ?
-       AND (provision_started_at IS NULL OR provision_started_at < ?)
+     WHERE provision_attempts < ?
+       AND (
+         (
+           provision_state IN ('queued', 'failed')
+           AND (provision_started_at IS NULL OR provision_started_at < ?)
+         )
+         OR (
+           provision_state = 'running'
+           AND (provision_started_at IS NULL OR provision_started_at < ?)
+         )
+       )
      ORDER BY id
      LIMIT ?`,
   )
-    .bind(MAX_ATTEMPTS, graceBefore, PER_RUN)
+    .bind(MAX_ATTEMPTS, graceBefore, staleBefore, PER_RUN)
     .all<{ id: number }>();
 
   let done = 0;
