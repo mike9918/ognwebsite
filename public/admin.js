@@ -14,4 +14,23 @@
       return;
     }
   });
+
+  // Keep the sign-up table current while staff leave the tab open. Defer the
+  // reload while a field is focused so a half-filled settings edit isn't wiped.
+  const REFRESH_MS = 60_000;
+  const scheduleRefresh = () => {
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        active instanceof HTMLSelectElement
+      ) {
+        scheduleRefresh();
+        return;
+      }
+      location.reload();
+    }, REFRESH_MS);
+  };
+  scheduleRefresh();
 })();
