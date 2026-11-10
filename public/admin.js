@@ -18,7 +18,8 @@
   // Keep the sign-up table current while staff leave the tab open. Defer the
   // reload while a field is focused so a half-filled settings edit isn't wiped.
   const REFRESH_MS = 60_000;
-  const scheduleRefresh = () => {
+  const DEFER_MS = 5_000;
+  const scheduleRefresh = (delayMs = REFRESH_MS) => {
     window.setTimeout(() => {
       const active = document.activeElement;
       if (
@@ -26,11 +27,11 @@
         active instanceof HTMLTextAreaElement ||
         active instanceof HTMLSelectElement
       ) {
-        scheduleRefresh();
+        scheduleRefresh(DEFER_MS);
         return;
       }
       location.reload();
-    }, REFRESH_MS);
+    }, delayMs);
   };
   scheduleRefresh();
 })();
