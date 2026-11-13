@@ -75,7 +75,7 @@ a:hover { color: var(--ogn-primary-hover); }
 
 /* The header is sticky, so in-page jumps and the skip link need to land below it.
    The mobile bar wraps to two rows, which is why the offset is larger there. */
-html { scroll-padding-top: 96px; }
+html { scroll-padding-top: 104px; }
 
 .site-header {
   position: sticky;
@@ -90,9 +90,9 @@ html { scroll-padding-top: 96px; }
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 72px;
+  min-height: 80px;
   flex-wrap: wrap;
-  padding-block: 8px;
+  padding-block: 10px;
 }
 
 .header-inner nav {
@@ -109,7 +109,7 @@ html { scroll-padding-top: 96px; }
 }
 
 .brand img {
-  height: 32px;
+  height: 44px;
   width: auto;
 }
 
@@ -967,7 +967,7 @@ details p { margin-top: 0; color: var(--ogn-muted); }
   .stat-row { grid-template-columns: repeat(4, 1fr); }
   .signup-page .stat-row { grid-template-columns: repeat(2, 1fr); }
   .hero { padding-top: 28px; }
-  .brand img { height: 40px; }
+  .brand img { height: 52px; }
   .footer-grid { grid-template-columns: 1.4fr repeat(3, 1fr); gap: 32px; }
   .supporter-teaser {
     grid-template-columns: 1fr auto auto;
