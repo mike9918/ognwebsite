@@ -195,11 +195,89 @@ h3 { font-size: 1.15rem; margin-bottom: 8px; }
   border-bottom: 1px solid var(--ogn-border);
 }
 
+.hero-band--photo {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: min(92vh, 860px);
+  display: flex;
+  align-items: center;
+  border-bottom: 0;
+  background: #07110c;
+}
+
+.hero-band--photo .frame {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, calc(100% - 32px));
+}
+
+.hero-band-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  transform: scale(1.04);
+  animation: hero-drift 18s ease-in-out alternate infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-band-photo { animation: none; transform: scale(1.02); }
+  .hero-band--photo .hero-copy,
+  .hero-band--photo .hero-side { animation: none; }
+}
+
+@keyframes hero-drift {
+  from { transform: scale(1.04) translate3d(0, 0, 0); }
+  to { transform: scale(1.08) translate3d(-1.2%, -0.6%, 0); }
+}
+
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero-band--photo .hero-copy {
+  animation: hero-rise 0.7s ease-out both;
+}
+
+.hero-band--photo .hero-side {
+  animation: hero-rise 0.7s ease-out 0.12s both;
+}
+
+.hero-band-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(7, 17, 12, 0.92) 0%, rgba(7, 17, 12, 0.72) 42%, rgba(7, 17, 12, 0.5) 100%),
+    linear-gradient(180deg, rgba(7, 17, 12, 0.55) 0%, rgba(7, 17, 12, 0.28) 35%, rgba(7, 17, 12, 0.78) 100%),
+    radial-gradient(720px 380px at 18% 20%, rgba(92, 203, 139, 0.18), transparent 60%);
+}
+
 .hero-split {
   display: grid;
   gap: 28px;
   padding: 36px 0 48px;
   align-items: start;
+}
+
+.hero-band--photo .hero-split {
+  padding: 48px 0 56px;
+  align-items: center;
+}
+
+.hero-band--photo .hero-copy .lede {
+  color: color-mix(in srgb, var(--ogn-text) 82%, transparent);
+}
+
+.hero-band--photo .button-secondary {
+  background: rgba(7, 17, 12, 0.45);
+  backdrop-filter: blur(8px);
 }
 
 .hero-actions { margin-top: 22px; }
@@ -213,6 +291,18 @@ h3 { font-size: 1.15rem; margin-bottom: 8px; }
 .hero-side { min-width: 0; }
 
 .side-note { margin: 12px 0 0; font-size: 0.92rem; }
+
+.hero-band--photo .side-note {
+  color: color-mix(in srgb, var(--ogn-text) 78%, transparent);
+}
+
+.hero-band--photo .signup-card,
+.hero-band--photo .card {
+  background: color-mix(in srgb, var(--ogn-surface) 88%, transparent);
+  backdrop-filter: blur(14px);
+  border-color: color-mix(in srgb, var(--ogn-primary) 42%, var(--ogn-border));
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.42);
+}
 
 .section {
   padding: 48px 0;
@@ -372,6 +462,13 @@ fieldset {
 }
 
 .choice input { width: 1.15rem; height: 1.15rem; min-height: 0; }
+
+.choice-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
 
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
@@ -704,7 +801,7 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 .hero-photo { margin: 8px 0 0; }
 
 .hero-photo img,
-.feature-split img {
+.feature-split > img {
   display: block;
   width: 100%;
   height: auto;
@@ -720,6 +817,54 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 }
 
 .feature-split p:last-child { margin-bottom: 0; }
+
+.platform-strip {
+  margin: 18px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--ogn-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ogn-surface) 70%, transparent);
+}
+
+.platform-strip-label {
+  margin: 0 0 10px;
+  color: var(--ogn-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.platform-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platform-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--ogn-border);
+  border-radius: 999px;
+  background: var(--ogn-background);
+  color: var(--ogn-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.platform-chip img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
 
 .type-spec {
   margin: 0 0 8px;
@@ -798,6 +943,22 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 
 @media (max-width: 719px) {
   html { scroll-padding-top: 168px; }
+  .hero-band--photo {
+    min-height: 0;
+    align-items: stretch;
+  }
+  .hero-band--photo .hero-split {
+    padding: 28px 0 36px;
+  }
+  .hero-band-shade {
+    background:
+      linear-gradient(180deg, rgba(7, 17, 12, 0.86) 0%, rgba(7, 17, 12, 0.74) 40%, rgba(7, 17, 12, 0.94) 100%),
+      radial-gradient(520px 280px at 50% 0%, rgba(92, 203, 139, 0.14), transparent 65%);
+  }
+  .hero-band--photo .signup-card,
+  .hero-band--photo .card {
+    background: color-mix(in srgb, var(--ogn-surface) 94%, transparent);
+  }
 }
 
 @media (min-width: 720px) {
@@ -824,9 +985,17 @@ details p { margin-top: 0; color: var(--ogn-muted); }
     gap: 48px;
     padding-top: 56px;
   }
+  .hero-band--photo .hero-split {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 40px;
+    padding-top: 64px;
+    padding-bottom: 72px;
+  }
+  .hero-band--photo .hero-copy h1 { max-width: 12ch; }
   .signup-page .hero-split { padding-top: 8px; }
   .signup-page .hero-side { order: 0; }
 }
+
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
