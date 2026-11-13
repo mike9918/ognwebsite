@@ -67,7 +67,15 @@ a:hover { color: var(--ogn-primary-hover); }
   text-decoration: none;
 }
 
-.skip:focus { top: 16px; }
+.skip:focus,
+.skip:focus-visible {
+  top: 12px;
+  z-index: 30;
+}
+
+/* The header is sticky, so in-page jumps and the skip link need to land below it.
+   The mobile bar wraps to two rows, which is why the offset is larger there. */
+html { scroll-padding-top: 96px; }
 
 .site-header {
   position: sticky;
@@ -200,7 +208,7 @@ h3 { font-size: 1.15rem; margin-bottom: 8px; }
 
 .signup-page .hero-side { order: -1; }
 
-#signup { scroll-margin-top: 88px; }
+#signup { scroll-margin-top: 8px; }
 
 .hero-side { min-width: 0; }
 
@@ -745,6 +753,10 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 }
 
 .breadcrumb a { text-decoration: none; font-weight: 700; }
+
+@media (max-width: 719px) {
+  html { scroll-padding-top: 168px; }
+}
 
 @media (min-width: 720px) {
   .cards { grid-template-columns: repeat(3, 1fr); }
