@@ -155,7 +155,10 @@ describe("pages", () => {
     expect(html).toContain("OpenGameNode — Free Minecraft Server Hosting");
     expect(html).toContain('rel="canonical" href="https://opengamenode.com"');
     expect(html).toContain("application/ld+json");
-    expect(html).toContain("opengamnode");
+    expect(html).toContain("Open Game Node");
+    expect(html).not.toContain("opengamnode");
+    expect(html).toContain("/art/world-valley.jpg");
+    expect(html).toContain("twice a day");
     expect(html).toContain('action="/api/auth/discord"');
     expect(html).toContain("Sign up free with Discord");
     expect(html).toContain("Open to everyone");

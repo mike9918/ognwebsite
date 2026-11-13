@@ -68,8 +68,8 @@ export const content = {
         body: "Every Start gives you a session of about four hours, with a countdown on your server page.",
       },
       {
-        title: "Extend once a day",
-        body: "In the last ten minutes of a session you can click Extend to add about four more hours, once per day.",
+        title: "Extend twice a day",
+        body: "In the last ten minutes you can click Extend to add about four more hours. You can do that twice a day.",
       },
       {
         title: "Quiet servers sleep",
@@ -84,21 +84,38 @@ export const content = {
         runType: "vanilla",
         title: "Vanilla",
         body: "Plain Minecraft Java, with nothing extra installed.",
+        image: "/art/vanilla-plains.jpg",
+        imageAlt: "A timber cottage and wheat field in a block-built forest",
+        width: 960,
+        height: 720,
       },
       {
         runType: "plugins",
         title: "Paper",
         body: "Plugins on Paper. Upload your own files over SFTP.",
+        image: "/art/plugins-workshop.jpg",
+        imageAlt: "A stone workshop of pipes, gears, and lanterns",
+        width: 960,
+        height: 720,
       },
       {
         runType: "modpack",
         title: "Modpack",
-        body: "A curated set of mods, with more RAM than vanilla.",
+        body: "A curated set of mods, with 3 GB of RAM instead of 2.",
+        image: "/art/modpack-islands.jpg",
+        imageAlt: "Floating islands, a crystal spire, and a wooden airship",
+        width: 1152,
+        height: 864,
       },
     ],
+    modpackHeading: "Bring a modpack",
+    modpackBody:
+      "A modpack is a set of mods that already fit together: machines, magic, exploration, or a kitchen-sink world with some of each. Pick Modpack when you sign up. Free servers get 3 GB of RAM for it, and you upload the pack over SFTP.",
+    modpackSoon:
+      "Supporters will get one-click modpack installers. That part is coming soon, and it is not in the panel yet.",
     supporterHeading: "OpenGameNode Supporter",
     supporterBody:
-      "No ads, priority start when the node is full, +1 GB RAM and a Discord role. $1.99 a month, cancel anytime.",
+      "No ads, no four-hour cap, priority start, and +2 GB RAM. $1.99 a month. One-click modpack installers and a player manager are coming soon.",
     supporterLink: "About Supporter",
     faqHeading: "Questions",
     faqMore: "See all questions",
@@ -130,7 +147,7 @@ export const content = {
     {
       question: "Is it really free?",
       answer:
-        "Yes. Free Minecraft servers, paid for by one small display ad per panel page. Supporter ($1.99/month) is optional and just removes ads and adds a few extras.",
+        "Yes. Free Minecraft servers, paid for by one small display ad per panel page. Supporter ($1.99/month) is optional: it removes ads, removes the four-hour cap, and adds 2 GB of RAM.",
     },
     {
       question: "How do I sign up?",
@@ -155,7 +172,7 @@ export const content = {
     {
       question: "How long does my server run?",
       answer:
-        "Each start gives you about 4 hours, with a countdown on your server page. In the last 10 minutes you can click Extend to add about 4 more hours, once per day. If nobody's on for 5 minutes, the server shuts off and that session ends. Click Start in the panel for a fresh 4 hours. Players joining won't start it. Separately, you're signed out of the panel after an hour of inactivity, but your servers keep running.",
+        "Each start gives you about 4 hours, with a countdown on your server page. In the last 10 minutes you can click Extend to add about 4 more hours, twice a day. If nobody's on for 5 minutes, the server shuts off and that session ends. Click Start in the panel for a fresh 4 hours. Players joining won't start it. Supporter servers are not cut off after four hours. Separately, you're signed out of the panel after an hour of inactivity, but your servers keep running.",
     },
     {
       question: "What happens when nobody's online?",
@@ -180,7 +197,7 @@ export const content = {
     {
       question: "What's Supporter?",
       answer:
-        "$1.99/month for no ads, priority start, +1 GB RAM and a Discord Supporter role, with more perks later. Cancel anytime through Stripe and keep your perks until the period ends. Full refund within 7 days of your first charge.",
+        "$1.99/month for no ads, no four-hour session cap, priority start, +2 GB RAM and a Discord Supporter role. One-click modpack installers and a player manager are coming soon and are not in the panel yet. Cancel anytime through Stripe and keep your perks until the period ends. Full refund within 7 days of your first charge.",
     },
     {
       question: "Who can use it?",
@@ -197,13 +214,15 @@ export const content = {
     tagline: "Optional, and it keeps the ads off",
     price: "$1.99",
     period: "/month",
-    lead: "Go ad-free and get a little extra.",
+    lead: "No ads, no four-hour cap, and a bit more room to play.",
     perks: [
       "No ads anywhere in the panel.",
+      "No four-hour session cap. A server with nobody on it for five minutes still sleeps, and the world stays saved.",
       "Priority start — you jump ahead when the node is full. Priority, not a guaranteed spot.",
-      "+1 GB RAM on your server.",
+      "+2 GB RAM on your server.",
       "Supporter role in our Discord.",
-      "More perks later as we grow.",
+      "One-click modpack installers, coming soon.",
+      "A player manager, coming soon.",
     ],
     billing:
       "Payments go through Stripe, and we never see or store your full card number. Cancel anytime through Stripe — canceling stops the next charge and you keep your perks until the end of the period you've already paid for.",
@@ -233,11 +252,10 @@ export const content = {
     privacy: "Privacy Policy",
     aup: "Acceptable Use Policy",
     updatedLabel: "Last updated:",
-    updated: "2 November 2026",
+    updated: "13 November 2026",
   },
   footer: {
-    nameLine:
-      "OpenGameNode (Open Game Node, OGN). If you typed opengamnode, you're in the right place.",
+    nameLine: "OpenGameNode (Open Game Node, OGN).",
     operator:
       "OpenGameNode is operated by MH Tech Solutions. Contact: support@opengamenode.com",
     minecraft:

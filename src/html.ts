@@ -169,6 +169,7 @@ function serverTypeCards(): string {
     .map((type) => {
       const plan = SERVER_PLANS[type.runType];
       return `<article class="card type-card">
+        <img src="${type.image}" alt="${escapeHtml(type.imageAlt)}" width="${type.width}" height="${type.height}" loading="lazy" decoding="async">
         <p class="kicker">Minecraft Java</p>
         <h3>${escapeHtml(type.title)}</h3>
         <p class="type-spec">${escapeHtml(gb(plan.memoryMiB))} RAM · ${escapeHtml(threads(plan.cpuPercent))}</p>
@@ -475,6 +476,9 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
               </p>
             </div>
           </section>
+          <figure class="hero-photo">
+            <img src="/art/world-valley.jpg" alt="A block-built castle above a river valley at night" width="1280" height="720" decoding="async">
+          </figure>
         </div>
       </div>
       <div class="frame">
@@ -493,6 +497,18 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
           <h2 id="games-heading">${escapeHtml(content.home.gamesHeading)}</h2>
           <p class="section-intro">${escapeHtml(content.home.gamesBody)}</p>
           ${serverTypeCards()}
+        </section>
+
+        <section class="section" aria-labelledby="modpack-heading">
+          <div class="feature-split">
+            <img src="/art/modpack-islands.jpg" alt="Floating islands, a crystal spire, and a wooden airship" width="1152" height="864" loading="lazy" decoding="async">
+            <div>
+              <h2 id="modpack-heading">${escapeHtml(content.home.modpackHeading)}</h2>
+              <p>${escapeHtml(content.home.modpackBody)}</p>
+              <p class="note">${escapeHtml(content.home.modpackSoon)}</p>
+              <p class="actions"><a class="button button-secondary" href="/signup">${escapeHtml(content.home.primaryAction)}</a></p>
+            </div>
+          </div>
         </section>
 
         <section class="section" aria-labelledby="features-heading">
@@ -540,9 +556,14 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
         </section>
 
         <section class="section" aria-labelledby="community-heading">
-          <h2 id="community-heading">${escapeHtml(content.home.communityHeading)}</h2>
-          <p class="section-intro">${escapeHtml(content.home.communityBody)}</p>
-          ${community}
+          <div class="feature-split">
+            <img src="/art/friends-camp.jpg" alt="Three blocky figures around a campfire above a forest valley" width="1280" height="720" loading="lazy" decoding="async">
+            <div>
+              <h2 id="community-heading">${escapeHtml(content.home.communityHeading)}</h2>
+              <p class="section-intro">${escapeHtml(content.home.communityBody)}</p>
+              ${community}
+            </div>
+          </div>
         </section>
       </div>
     </div>`,
@@ -637,6 +658,10 @@ export function minecraftPage(inviteUrl: string | null): string {
           <a class="button button-secondary" href="/faq">${escapeHtml(content.home.faqMore)}</a>
         </p>
       </section>
+      <figure class="hero-photo">
+        <img src="/art/world-valley.jpg" alt="A block-built castle above a river valley at night" width="1280" height="720" decoding="async">
+      </figure>
+      ${serverTypeCards()}
 
       <section aria-labelledby="specs-heading">
         <h2 id="specs-heading">${escapeHtml(content.landing.specsHeading)}</h2>
@@ -648,8 +673,8 @@ export function minecraftPage(inviteUrl: string | null): string {
       <section aria-labelledby="shared-heading">
         <h2 id="shared-heading">${escapeHtml(content.landing.sharedHeading)}</h2>
         <ul class="facts">
-          <li>About four hours each time you press Start, with a countdown on your server page.</li>
-          <li>Extend once a day, in the last ten minutes, for about four more hours.</li>
+          <li>On the free plan, about four hours each time you press Start. Supporter removes that cap.</li>
+          <li>In the last ten minutes, extend twice a day for about four more hours each time.</li>
           <li>The server sleeps after five quiet minutes. Your world and files stay saved.</li>
           <li>Upload mods, plugins and worlds over SFTP.</li>
           <li>One small display ad per panel page. No ad before Start, and nothing in-game.</li>
@@ -738,6 +763,9 @@ export function supporterPage(inviteUrl: string | null): string {
         <h1>${escapeHtml(content.supporter.heading)}</h1>
         <p class="supporting">${escapeHtml(content.supporter.lead)}</p>
       </section>
+      <figure class="hero-photo">
+        <img src="/art/modpack-islands.jpg" alt="Floating islands and a crystal spire, the kind of world a modpack is for" width="1152" height="864" decoding="async">
+      </figure>
       <section class="card price-card" aria-labelledby="price-heading">
         <h2 id="price-heading" class="price">${escapeHtml(content.supporter.price)}<span class="price-period">${escapeHtml(content.supporter.period)}</span></h2>
         <ul class="perks">

@@ -28,7 +28,7 @@ export const descriptions = {
   signup: "Sign up with Discord for a free OpenGameNode Minecraft server. Pick vanilla, Paper plugins, or a modpack. No password to set up.",
   faq: "How OpenGameNode free Minecraft servers work: sessions, ads, plugins, modpacks, Supporter, and who can sign up.",
   minecraft: `Free Minecraft Java hosting from OpenGameNode: ${RAM} GB RAM for vanilla and Paper, ${MOD_RAM} GB for a modpack, ${DISK} GB disk, about four hours a session.`,
-  supporter: "OpenGameNode Supporter is $1.99/month: no ads, priority start, +1 GB RAM and a Discord role. Cancel anytime.",
+  supporter: "OpenGameNode Supporter is $1.99/month: no ads, no four-hour cap, priority start, +2 GB RAM and a Discord role. Cancel anytime.",
   help: "Short guides for starting a free Minecraft server, inviting friends, uploading a world, keeping backups and Supporter billing.",
 } as const;
 
@@ -55,7 +55,7 @@ export function pageStructuredData(input: {
       "@type": "Organization",
       "@id": `${origin}/#organization`,
       name: content.name,
-      alternateName: ["Open Game Node", "OGN", "opengamnode"],
+      alternateName: ["Open Game Node", "OGN"],
       url: absolute("/"),
       logo: `${origin}/brand/opengamenode-icon.png`,
       email: "support@opengamenode.com",
@@ -65,7 +65,7 @@ export function pageStructuredData(input: {
       "@type": "WebSite",
       "@id": `${origin}/#website`,
       name: content.name,
-      alternateName: ["Open Game Node", "OGN", "opengamnode"],
+      alternateName: ["Open Game Node", "OGN"],
       url: absolute("/"),
       description: descriptions.home,
       publisher: { "@id": `${origin}/#organization` },

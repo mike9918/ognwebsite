@@ -198,7 +198,7 @@ npm run check
 
 ## Search
 
-The homepage title leads with OpenGameNode and “free Minecraft server hosting”. `/sitemap.xml` lists the public pages, and `/robots.txt` points at it. After a deploy, submit that sitemap in Google Search Console and request indexing for `/` and `/free-minecraft-server`. A brand-new site stays invisible in Google until it has been crawled. The footer also names the spelling people miss (`opengamnode`, without the e in Game) so that search can match it once the site is indexed.
+The homepage title leads with OpenGameNode and “free Minecraft server hosting”. `/sitemap.xml` lists the public pages, and `/robots.txt` points at it. After a deploy, submit that sitemap in Google Search Console and request indexing for `/` and `/free-minecraft-server`. A brand-new site stays invisible in Google until it has been crawled.
 
 ## Provisioning
 
