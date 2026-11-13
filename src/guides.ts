@@ -17,7 +17,7 @@ export const guides: readonly Guide[] = [
     summary: "Sign up with Discord, pick what you're running, and start your server from the panel.",
     minutes: 4,
     body: `
-OpenGameNode hosts Minecraft servers for free. This guide walks through the whole thing, from signing up to your first join.
+OpenGameNode hosts Minecraft servers for free. The [free Minecraft server page](/free-minecraft-server) lists the RAM, disk and session limits. This guide walks through the whole thing, from signing up to your first join.
 
 ## 1. Sign up free
 

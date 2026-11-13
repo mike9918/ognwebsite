@@ -151,6 +151,11 @@ describe("pages", () => {
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Free game servers. More time to play.");
+    expect(html).toContain("Free Minecraft server hosting");
+    expect(html).toContain("OpenGameNode — Free Minecraft Server Hosting");
+    expect(html).toContain('rel="canonical" href="https://opengamenode.com"');
+    expect(html).toContain("application/ld+json");
+    expect(html).toContain("opengamnode");
     expect(html).toContain('action="/api/auth/discord"');
     expect(html).toContain("Sign up free with Discord");
     expect(html).toContain("Open to everyone");
@@ -193,7 +198,7 @@ describe("pages", () => {
   });
 
   it("keeps waitlist framing off every public page", async () => {
-    for (const path of ["/", "/wishlist", "/signup", "/faq", "/help", "/help/first-server"]) {
+    for (const path of ["/", "/signup", "/faq", "/help", "/help/first-server", "/free-minecraft-server", "/supporter"]) {
       const html = await (
         await exports.default.fetch(workerRequest(`https://opengamenode.com${path}`))
       ).text();
@@ -206,6 +211,63 @@ describe("pages", () => {
       expect(text, path).not.toContain("waitlist");
       expect(text, path).not.toContain("limited slot");
     }
+  });
+});
+
+describe("search", () => {
+  it("publishes a sitemap and robots file", async () => {
+    const sitemap = await exports.default.fetch(workerRequest("https://opengamenode.com/sitemap.xml"));
+    expect(sitemap.status).toBe(200);
+    expect(sitemap.headers.get("Content-Type")).toContain("xml");
+    const xml = await sitemap.text();
+    expect(xml).toContain("https://opengamenode.com/free-minecraft-server");
+    expect(xml).toContain("https://opengamenode.com/signup");
+    expect(xml).toContain("https://opengamenode.com/faq");
+    expect(xml).not.toContain("/admin");
+    expect(xml).not.toContain("/wishlist");
+    expect(xml).not.toContain("/api/");
+
+    const robots = await exports.default.fetch(workerRequest("https://opengamenode.com/robots.txt"));
+    expect(robots.status).toBe(200);
+    const text = await robots.text();
+    expect(text).toContain("Sitemap: https://opengamenode.com/sitemap.xml");
+    expect(text).toContain("Disallow: /admin");
+    expect(text).toContain("Disallow: /api/");
+  });
+
+  it("redirects short urls onto the canonical pages", async () => {
+    const wishlist = await exports.default.fetch(workerRequest("https://opengamenode.com/wishlist"));
+    expect(wishlist.status).toBe(301);
+    expect(wishlist.headers.get("Location")).toBe("/signup");
+
+    const minecraft = await exports.default.fetch(workerRequest("https://opengamenode.com/minecraft"));
+    expect(minecraft.status).toBe(301);
+    expect(minecraft.headers.get("Location")).toBe("/free-minecraft-server");
+  });
+
+  it("describes the free Minecraft server with the real plan limits", async () => {
+    const page = await exports.default.fetch(workerRequest("https://opengamenode.com/free-minecraft-server"));
+    expect(page.status).toBe(200);
+    expect(page.headers.get("Cache-Control")).toContain("public");
+    const html = await page.text();
+    expect(html).toContain("Free Minecraft Server Hosting · OpenGameNode");
+    expect(html).toContain("<h1>Free Minecraft server hosting</h1>");
+    expect(html).toContain("2 GB");
+    expect(html).toContain("3 GB");
+    expect(html).toContain("10 GB");
+    expect(html).toContain("Minecraft Java");
+    expect(html).toContain("Bedrock");
+    expect(html).toContain("application/ld+json");
+    expect(html).toContain("FAQPage");
+    expect(html).not.toContain("noindex");
+    const text = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<[^>]+>/g, " ").toLowerCase();
+    expect(text).not.toContain("waitlist");
+  });
+
+  it("keeps missing pages out of the index", async () => {
+    const missing = await exports.default.fetch(workerRequest("https://opengamenode.com/no-such-page"));
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).toContain("noindex");
   });
 });
 
@@ -309,6 +371,7 @@ describe("discord sign-up", () => {
     const page = await exports.default.fetch(workerRequest(`https://opengamenode.com${first.welcome}`));
     const html = await page.text();
     expect(html).toContain("You&#39;re signed up.");
+    expect(html).toContain("noindex");
     expect(html).toContain("ada@example.com");
     expect(html).toContain("we&#39;ve got your Discord account");
     expect(html).not.toContain("setting up your server now");

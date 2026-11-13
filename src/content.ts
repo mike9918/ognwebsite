@@ -4,21 +4,23 @@ export const content = {
   name: "OpenGameNode",
   siteOrigin: "https://opengamenode.com",
   description:
-    "Free Minecraft server hosting from OpenGameNode. Sign up free with Discord, start a server, invite your friends, keep your world.",
+    "OpenGameNode hosts free Minecraft Java servers. Sign up with Discord, start a server, invite your friends, and keep your world.",
   tagline: "Your game. Your server. Open to everyone.",
-  headline: "Free game servers. More time to play.",
-  supporting: "Start a server. Invite your friends. Make it yours.",
-  minecraftNote: "Minecraft is the only game at launch.",
+  headline: "Free Minecraft server hosting",
+  supporting: "Free game servers. More time to play.",
+  minecraftNote: "Minecraft Java is the game at launch. Bedrock isn't offered.",
   panelUrl: "https://panel.opengamenode.com",
   nav: {
+    minecraft: "Free server",
     faq: "FAQ",
     supporter: "Supporter",
     help: "Help",
     panel: "Sign in",
+    signup: "Sign up free",
   },
   home: {
     lead:
-      "Free, ad-supported hosting with a four-hour session, a simple panel and no ad before you press Start. Sign up free with Discord — we'll set up your server and tell you when it's ready.",
+      "OpenGameNode is free Minecraft server hosting. Sign up with Discord, pick vanilla, Paper, or a modpack, and we set up your server. A session runs about four hours, your world stays saved, and there's no ad before you press Start.",
     primaryAction: "Sign up free with Discord",
     secondaryAction: "Sign in to the panel",
     signupHeading: "Sign up free",
@@ -38,6 +40,11 @@ export const content = {
         body: "Share the address from your server page. Players join with Minecraft — they don't need an account here. Your world and files stay saved between sessions.",
       },
     ],
+    specsLink: "See free server specs",
+    honestHeading: "What free means",
+    honestBody:
+      "OpenGameNode stays free because of one small ad on each panel page. A session is about four hours, not a server that stays online all day. When it sleeps, your world and files stay saved.",
+    honestLink: "Free Minecraft server hosting, in detail",
     featuresHeading: "What you get",
     features: [
       {
@@ -54,12 +61,6 @@ export const content = {
         body: "Ads never block the controls, and you never watch an ad to start a server.",
       },
     ],
-    facts: [
-      "2 GB RAM for vanilla and plugins",
-      "3 GB RAM for modded",
-      "Low latency for North America",
-      "Manage your server from the panel",
-    ],
     sessionsHeading: "Sessions, in plain English",
     sessions: [
       {
@@ -75,9 +76,26 @@ export const content = {
         body: "Five minutes with nobody online and the server shuts off to free room for others. Your world and files are saved, and Start brings it back for a fresh session.",
       },
     ],
-    gamesHeading: "Games",
+    gamesHeading: "Pick a Minecraft server",
     gamesBody:
-      "Vanilla, plugins on Paper, or a modpack. One game, done properly, instead of a long list we can't support yet.",
+      "Vanilla, plugins on Paper, or a modpack. Minecraft Java is the game at launch — Bedrock isn't offered.",
+    serverTypes: [
+      {
+        runType: "vanilla",
+        title: "Vanilla",
+        body: "Plain Minecraft Java, with nothing extra installed.",
+      },
+      {
+        runType: "plugins",
+        title: "Paper",
+        body: "Plugins on Paper. Upload your own files over SFTP.",
+      },
+      {
+        runType: "modpack",
+        title: "Modpack",
+        body: "A curated set of mods, with more RAM than vanilla.",
+      },
+    ],
     supporterHeading: "OpenGameNode Supporter",
     supporterBody:
       "No ads, priority start when the node is full, +1 GB RAM and a Discord role. $1.99 a month, cancel anytime.",
@@ -88,6 +106,24 @@ export const content = {
     communityBody:
       "Support, help and server talk happen in our Discord. Email support@opengamenode.com if you'd rather not join.",
     joinDiscord: "Join the Discord",
+  },
+  landing: {
+    lede:
+      "OpenGameNode hosts a free Minecraft Java server you can start with Discord. Pick vanilla, Paper plugins, or a modpack. Your world stays saved between sessions, and you never watch an ad before you press Start.",
+    specsHeading: "What a free server includes",
+    specsIntro:
+      "One server on the free plan. These are the limits the panel actually creates, not a teaser that shrinks after you sign up.",
+    sharedHeading: "On every free server",
+    limitsHeading: "What free does not mean",
+    limits: [
+      "It is not a 24/7 server. Each Start runs for about four hours, and the server sleeps after five minutes with nobody online.",
+      "It is Minecraft Java. Bedrock Edition isn't offered.",
+      "Friends can join without an account, but only you can press Start.",
+      "Ads keep the free plan free: one small display ad per panel page. Nothing in-game, nothing over the console, and no ad before Start.",
+      "Keep your own backup of the world. The panel includes one backup slot, and free hosting is best-effort.",
+    ],
+    startHeading: "From sign-up to your first session",
+    region: "Low latency for North America.",
   },
   faqHeading: "Questions",
   faq: [
@@ -100,6 +136,21 @@ export const content = {
       question: "How do I sign up?",
       answer:
         "Tap Sign up free with Discord on the homepage, pick what you're running, and sign in with Discord. We create your panel account from your verified Discord email, so there's no form to fill in and no password to set up. We'll DM or email you when your server is ready to Start in the panel.",
+    },
+    {
+      question: "Can I run plugins or a modpack?",
+      answer:
+        "Yes. Choose plugins for a Paper server, or a modpack if you're running a curated set of mods. You can upload mods and files over SFTP. It's Minecraft Java — Bedrock isn't offered.",
+    },
+    {
+      question: "Do my friends need an account?",
+      answer:
+        "No. Share the address from your server page and they join with Minecraft. They don't need an OpenGameNode account. Only the owner can press Start, and a player joining won't turn a sleeping server back on.",
+    },
+    {
+      question: "Is it Java or Bedrock?",
+      answer:
+        "Java. OpenGameNode runs Minecraft Java: vanilla, plugins on Paper, or a modpack. Bedrock Edition isn't offered.",
     },
     {
       question: "How long does my server run?",
@@ -173,7 +224,7 @@ export const content = {
     heading: "Help guides",
     tagline: "Short answers, no support ticket",
     intro:
-      "Practical guides for the things people ask about most: starting a server, inviting friends, moving a world, backups and billing.",
+      "Practical guides for the things people ask about most: starting a Minecraft server, inviting friends, moving a world, backups and billing.",
     more: "Something else? Ask in our Discord or email support@opengamenode.com.",
     back: "All help guides",
   },
@@ -185,6 +236,8 @@ export const content = {
     updated: "2 November 2026",
   },
   footer: {
+    nameLine:
+      "OpenGameNode (Open Game Node, OGN). If you typed opengamnode, you're in the right place.",
     operator:
       "OpenGameNode is operated by MH Tech Solutions. Contact: support@opengamenode.com",
     minecraft:
