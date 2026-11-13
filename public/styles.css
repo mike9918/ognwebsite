@@ -801,7 +801,7 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 .hero-photo { margin: 8px 0 0; }
 
 .hero-photo img,
-.feature-split img {
+.feature-split > img {
   display: block;
   width: 100%;
   height: auto;
@@ -857,8 +857,11 @@ details p { margin-top: 0; color: var(--ogn-muted); }
 }
 
 .platform-chip img {
+  display: block;
   width: 22px;
   height: 22px;
+  border: 0;
+  border-radius: 0;
   object-fit: contain;
   flex: 0 0 auto;
 }
