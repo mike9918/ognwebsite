@@ -174,9 +174,12 @@ npm run check
 
 | Path | What it is |
 | --- | --- |
-| `/` | Frontpage: hero, how it works, features, sessions, games, Supporter teaser, FAQ preview, sign-up form |
-| `/signup` | Discord sign-up form and sign-up status screen (alias of `/wishlist`) |
-| `/wishlist` | Canonical URL for the sign-up page; Discord OAuth returns here |
+| `/` | Frontpage: hero, sign-up, specs, how it works, sessions, Supporter teaser, FAQ preview |
+| `/free-minecraft-server` | Free Minecraft Java server specs, limits, and FAQ. `/minecraft` redirects here |
+| `/signup` | Discord sign-up form and sign-up status screen. Canonical sign-up URL |
+| `/wishlist` | Discord OAuth returns here. A bare visit redirects to `/signup` |
+| `/sitemap.xml` | Public page list for search engines |
+| `/robots.txt` | Crawler rules. Disallows `/admin` and `/api/`, and points at the sitemap |
 | `/faq` | Full FAQ, final approved copy |
 | `/supporter` | Supporter tier, $1.99/month. Checkout button is a placeholder until Stripe is live |
 | `/help` | Index of the five help guides |
@@ -192,6 +195,10 @@ npm run check
 | `/api/capacity` | Public `{ accepting: boolean }` flag for the at-capacity state |
 
 `www.opengamenode.com` redirects to the apex. Custom domains for the apex and `www` are in `wrangler.jsonc`.
+
+## Search
+
+The homepage title leads with OpenGameNode and “free Minecraft server hosting”. `/sitemap.xml` lists the public pages, and `/robots.txt` points at it. After a deploy, submit that sitemap in Google Search Console and request indexing for `/` and `/free-minecraft-server`. A brand-new site stays invisible in Google until it has been crawled.
 
 ## Provisioning
 

@@ -17,7 +17,7 @@ Only one placeholder is left in the final documents.
 - Support email: support@opengamenode.com. Abuse/admin email: admin@opengamenode.com.
 - Operator: MH Tech Solutions, a sole proprietorship owned by Michael Herman.
 - Empty for 5 minutes → server shuts off and its 4-hour session is canceled. A player joining won't start it again; the owner clicks Start in the panel for a fresh session.
-- Extend: in the last 10 minutes, adds about 4 hours, once per day.
+- Extend: in the last 10 minutes, adds about 4 hours, twice per day. Supporter has no four-hour cap.
 - "Not affiliated with PloudOS or its creator" in every footer, the disclaimer and Terms §1.
 - Terms §7 and §9: no "for no reason" bans, notice and a chance to download where reasonable, appeals by email, liability cap of the greater of 3 months' payments or US$10, no release of unknown claims.
 

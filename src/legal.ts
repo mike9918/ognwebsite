@@ -32,8 +32,9 @@ You're signed out of the panel after about one hour of inactivity. Your servers 
 
 The service runs on a best-effort basis. It is free and ad-supported, and we do not promise that it will be available at any particular time.
 
-- Each Start gives a session of about four hours.
-- In the last ten minutes of a session, the owner can click Extend to add about four more hours. Extend can be used once per day.
+- On the free plan, each Start gives a session of about four hours.
+- In the last ten minutes of a free session, the owner can click Extend to add about four more hours. Extend can be used twice per day.
+- A Supporter server is not limited to a four-hour session.
 - If nobody is on a server for about five minutes, it shuts off and its session is canceled. The timer does not keep running. A player joining won't start it again. The owner clicks Start again to begin a fresh session.
 - When a session ends, the server shuts off until the owner clicks Start.
 - Worlds and files are kept between sessions unless removed under these terms.
@@ -51,7 +52,7 @@ You are responsible for your content.
 
 ## 5. Supporter tier
 
-The Supporter tier costs US$1.99 per month and is billed by Stripe. It currently includes no ads, priority start (priority, not guaranteed), +1 GB RAM and a Discord Supporter role. Perks may be added, changed or removed. You can cancel at any time through Stripe. Canceling stops the next charge, and you keep your Supporter perks until the end of the period you've already paid for.
+The Supporter tier costs US$1.99 per month and is billed by Stripe. It currently includes no ads, no four-hour session cap, priority start (priority, not guaranteed), +2 GB RAM and a Discord Supporter role. One-click modpack installers and a player manager are planned and are not included until they are available in the panel. Perks may be added, changed or removed. You can cancel at any time through Stripe. Canceling stops the next charge, and you keep your Supporter perks until the end of the period you've already paid for.
 
 **Refunds:**
 

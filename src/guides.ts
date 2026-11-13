@@ -17,7 +17,7 @@ export const guides: readonly Guide[] = [
     summary: "Sign up with Discord, pick what you're running, and start your server from the panel.",
     minutes: 4,
     body: `
-OpenGameNode hosts Minecraft servers for free. This guide walks through the whole thing, from signing up to your first join.
+OpenGameNode hosts Minecraft servers for free. The [free Minecraft server page](/free-minecraft-server) lists the RAM, disk and session limits. This guide walks through the whole thing, from signing up to your first join.
 
 ## 1. Sign up free
 
@@ -45,7 +45,7 @@ Your server page shows the address to connect to and the SFTP details for upload
 
 ## When the session ends
 
-In the last ten minutes you can click Extend to add about four more hours, once per day. After that, the server shuts off and players are disconnected. Your world and files are saved. Click Start again for a fresh session.
+In the last ten minutes you can click Extend to add about four more hours, twice a day. After both extensions are used, the server shuts off and players are disconnected. Your world and files are saved. Click Start again for a fresh session. Supporter servers are not cut off after four hours.
 
 If nobody is on the server for five minutes, it shuts off to free room for other people. That cancels the session, and a player joining won't turn it back on. The owner clicks Start.
 
@@ -74,7 +74,7 @@ Send the address to your friends however you like — Discord, a group chat, any
 
 Your server only runs during a session. Sessions last about four hours and start when the owner clicks Start. If a friend joins while the server is off, they can't start it for you. Only the owner can.
 
-When the time runs out, everyone is disconnected with a message pointing at panel.opengamenode.com. If you extend in the last ten minutes, you get about four more hours and your friends stay on.
+When the time runs out, everyone is disconnected with a message pointing at panel.opengamenode.com. If you extend in the last ten minutes, you get about four more hours and your friends stay on. You can extend twice a day. A Supporter server is not cut off after four hours.
 
 ## If the server goes quiet
 
@@ -167,10 +167,12 @@ Supporter is the optional paid tier. It removes ads and adds a few extras, and i
 ## What you get
 
 - No ads anywhere in the panel.
+- No four-hour session cap. A server with nobody on it for five minutes still sleeps, and the world stays saved.
 - Priority start — you jump ahead when the node is full. Priority, not a guaranteed spot.
-- +1 GB RAM on your server.
+- +2 GB RAM on your server.
 - A Supporter role in our Discord.
-- More perks later as we grow.
+- One-click modpack installers, coming soon. Not in the panel yet.
+- A player manager, coming soon. Not in the panel yet.
 
 ## Billing
 

@@ -66,7 +66,7 @@ def main() -> None:
     )
 
     headline = load_font(46, 800)
-    centered(draw, "Free game servers. More time to play.", headline, rule_y + 36, TEXT)
+    centered(draw, "Free Minecraft server hosting", headline, rule_y + 36, TEXT)
 
     url_font = load_font(28, 600)
     centered(draw, "opengamenode.com", url_font, rule_y + 104, MUTED)

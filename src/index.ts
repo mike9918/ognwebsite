@@ -30,6 +30,7 @@ import {
   helpIndexPage,
   homePage,
   legalPage,
+  minecraftPage,
   notFoundPage,
   supporterPage,
   textPage,
@@ -41,6 +42,7 @@ import {
 import { findByRef, normalizeRef, toPublic } from "./signup";
 import { signupBlockedReason } from "./settings";
 import { findGuide } from "./guides";
+import { robotsTxt, sitemapXml } from "./seo";
 import { aupBody, privacyBody, termsBody } from "./legal";
 import { provisionConfig, provisionEntry, provisioningConfigured } from "./provision";
 import { sweepSignups } from "./sweep";
@@ -52,24 +54,49 @@ function emptyValues(): FormValues {
   };
 }
 
-function htmlResponse(body: string, status: number, method: string, cookies: string[] = []): Response {
+function htmlResponse(
+  body: string,
+  status: number,
+  method: string,
+  cookies: string[] = [],
+  cacheControl = "no-store",
+): Response {
   const headers = new Headers({
     "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "no-store",
+    "Cache-Control": cacheControl,
     ...securityHeaders(),
   });
   for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(method === "HEAD" ? null : body, { status, headers });
 }
 
-function redirect(location: string, status: number, cookies: string[] = []): Response {
+function redirect(
+  location: string,
+  status: number,
+  cookies: string[] = [],
+  cacheControl = "no-store",
+): Response {
   const headers = new Headers({
     Location: location,
-    "Cache-Control": "no-store",
+    "Cache-Control": cacheControl,
     ...securityHeaders(),
   });
   for (const cookie of cookies) headers.append("Set-Cookie", cookie);
   return new Response(null, { status, headers });
+}
+
+const PUBLIC_PAGE = "public, max-age=300";
+const PUBLIC_REDIRECT = "public, max-age=86400";
+
+function textResponse(body: string, contentType: string, cacheControl: string, method: string): Response {
+  return new Response(method === "HEAD" ? null : body, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": cacheControl,
+      ...securityHeaders(),
+    },
+  });
 }
 
 function assetResponse(response: Response): Response {
@@ -379,7 +406,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       if (url.hostname === "www.opengamenode.com") {
         url.hostname = "opengamenode.com";
         url.protocol = "https:";
-        return redirect(url.toString(), 301);
+        return redirect(url.toString(), 301, [], PUBLIC_REDIRECT);
       }
 
       const method = request.method;
@@ -389,7 +416,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
       if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
         url.pathname = url.pathname.replace(/\/+$/, "");
-        return redirect(`${url.pathname}${url.search}`, 301);
+        return redirect(`${url.pathname}${url.search}`, 301, [], PUBLIC_REDIRECT);
       }
 
       if (method === "POST" && url.pathname === "/api/auth/discord") return handleDiscordStart(request, env);
@@ -432,21 +459,37 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
       }
 
       if (method === "GET" || method === "HEAD") {
+        if (url.pathname === "/robots.txt") {
+          return textResponse(robotsTxt(), "text/plain; charset=utf-8", "public, max-age=3600", method);
+        }
+        if (url.pathname === "/sitemap.xml") {
+          return textResponse(sitemapXml(), "application/xml; charset=utf-8", "public, max-age=3600", method);
+        }
+        if (url.pathname === "/minecraft") {
+          return redirect("/free-minecraft-server", 301, [], PUBLIC_REDIRECT);
+        }
         if (url.pathname === "/") return homeGet(request, env);
-        // /signup is the public link; /wishlist stays for the OAuth callback.
+        // /signup is the public link. A bare /wishlist redirects there; the
+        // OAuth callback still returns to /wishlist with a query string.
+        if (url.pathname === "/wishlist" && url.search === "") {
+          return redirect("/signup", 301, [], PUBLIC_REDIRECT);
+        }
         if (url.pathname === "/wishlist" || url.pathname === "/signup") {
           return wishlistGet(request, env);
         }
-        if (url.pathname === "/faq") return htmlResponse(faqPage(inviteUrl(env)), 200, method);
+        if (url.pathname === "/free-minecraft-server") {
+          return htmlResponse(minecraftPage(inviteUrl(env)), 200, method, [], PUBLIC_PAGE);
+        }
+        if (url.pathname === "/faq") return htmlResponse(faqPage(inviteUrl(env)), 200, method, [], PUBLIC_PAGE);
         if (url.pathname === "/supporter") {
-          return htmlResponse(supporterPage(inviteUrl(env)), 200, method);
+          return htmlResponse(supporterPage(inviteUrl(env)), 200, method, [], PUBLIC_PAGE);
         }
         if (url.pathname === "/help") {
-          return htmlResponse(helpIndexPage(inviteUrl(env)), 200, method);
+          return htmlResponse(helpIndexPage(inviteUrl(env)), 200, method, [], PUBLIC_PAGE);
         }
         if (url.pathname.startsWith("/help/")) {
           const guide = findGuide(url.pathname.slice("/help/".length));
-          if (guide) return htmlResponse(guidePage(guide, inviteUrl(env)), 200, method);
+          if (guide) return htmlResponse(guidePage(guide, inviteUrl(env)), 200, method, [], PUBLIC_PAGE);
         }
         if (url.pathname === "/admin") return adminGet(request, env);
         if (url.pathname === "/terms") {
@@ -454,6 +497,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
             legalPage({ title: content.legal.terms, body: termsBody, path: "/terms" }, inviteUrl(env)),
             200,
             method,
+            [],
+            PUBLIC_PAGE,
           );
         }
         if (url.pathname === "/privacy") {
@@ -461,6 +506,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
             legalPage({ title: content.legal.privacy, body: privacyBody, path: "/privacy" }, inviteUrl(env)),
             200,
             method,
+            [],
+            PUBLIC_PAGE,
           );
         }
         if (url.pathname === "/aup") {
@@ -468,6 +515,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
             legalPage({ title: content.legal.aup, body: aupBody, path: "/aup" }, inviteUrl(env)),
             200,
             method,
+            [],
+            PUBLIC_PAGE,
           );
         }
       }
