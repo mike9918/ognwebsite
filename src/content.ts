@@ -20,7 +20,7 @@ export const content = {
   },
   home: {
     lead:
-      "OpenGameNode is free Minecraft server hosting. Sign up with Discord, pick vanilla, Paper, or a modpack, and we set up your server. A session runs about four hours, your world stays saved, and there's no ad before you press Start.",
+      "Sign up with Discord, pick vanilla, Paper, or a CurseForge modpack, and we set up your server. About four hours a session, your world stays saved, and no ad before Start.",
     primaryAction: "Sign up free with Discord",
     secondaryAction: "Sign in to the panel",
     signupHeading: "Sign up free",
@@ -110,9 +110,36 @@ export const content = {
     ],
     modpackHeading: "Bring a modpack",
     modpackBody:
-      "A modpack is a set of mods that already fit together: machines, magic, exploration, or a kitchen-sink world with some of each. Pick Modpack when you sign up. Free servers get 3 GB of RAM for it, and you upload the pack over SFTP.",
+      "A modpack is a set of mods that already fit together: machines, magic, exploration, or a kitchen-sink world with some of each. Pick Modpack when you sign up. Free servers get 3 GB of RAM for it, and you upload the pack over SFTP from CurseForge, Fabric, Forge, or plain Minecraft Java.",
     modpackSoon:
       "Supporters will get one-click modpack installers. That part is coming soon, and it is not in the panel yet.",
+    platformsHeading: "Works with the packs you already use",
+    platforms: [
+      {
+        name: "Minecraft Java",
+        image: "/icons/minecraft.svg",
+        width: 64,
+        height: 64,
+      },
+      {
+        name: "CurseForge",
+        image: "/icons/curseforge.svg",
+        width: 24,
+        height: 24,
+      },
+      {
+        name: "Forge",
+        image: "/icons/forge.svg",
+        width: 64,
+        height: 64,
+      },
+      {
+        name: "Fabric",
+        image: "/icons/fabric.svg",
+        width: 64,
+        height: 64,
+      },
+    ],
     supporterHeading: "OpenGameNode Supporter",
     supporterBody:
       "No ads, no four-hour cap, priority start, and +2 GB RAM. $1.99 a month. One-click modpack installers and a player manager are coming soon.",

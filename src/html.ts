@@ -289,10 +289,25 @@ function layout(options: {
 }
 
 function heroCopy(): string {
-  return `<p class="eyebrow">${escapeHtml(content.name)} · Open to everyone</p>
+  return `<p class="eyebrow">${escapeHtml(content.name)}</p>
     <h1>${escapeHtml(content.headline)}</h1>
     <p class="supporting">${escapeHtml(content.supporting)}</p>
     <p class="lede">${escapeHtml(content.home.lead)}</p>`;
+}
+
+function platformStrip(): string {
+  const items = content.home.platforms
+    .map(
+      (platform) => `<li class="platform-chip">
+        <img src="${platform.image}" alt="" width="${platform.width}" height="${platform.height}" decoding="async">
+        <span>${escapeHtml(platform.name)}</span>
+      </li>`,
+    )
+    .join("");
+  return `<div class="platform-strip" aria-label="${escapeHtml(content.home.platformsHeading)}">
+    <p class="platform-strip-label">${escapeHtml(content.home.platformsHeading)}</p>
+    <ul class="platform-list">${items}</ul>
+  </div>`;
 }
 
 function formHead(view: WishlistView): string {
@@ -370,8 +385,14 @@ function waitlistForm(view: WishlistView): string {
                     : runType === "plugins"
                       ? content.form.plugins
                       : content.form.modpack;
+                const icon =
+                  runType === "vanilla"
+                    ? "/icons/minecraft.svg"
+                    : runType === "plugins"
+                      ? "/icons/paper.svg"
+                      : "/icons/curseforge.svg";
                 const checked = selectedRun === runType ? " checked" : "";
-                return `<label class="choice"><input type="radio" name="run_type" value="${runType}"${checked} required> <span>${escapeHtml(label)}</span></label>`;
+                return `<label class="choice"><input type="radio" name="run_type" value="${runType}"${checked} required> <img class="choice-icon" src="${icon}" alt="" width="24" height="24" decoding="async"> <span>${escapeHtml(label)}</span></label>`;
               })
               .join("")}
           </fieldset>
@@ -459,9 +480,11 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
     service: true,
     faq: previewFaq,
     main: `<div class="home">
-      <div class="hero-band">
+      <div class="hero-band hero-band--photo">
+        <img class="hero-band-photo" src="/art/world-valley.jpg" alt="" width="1280" height="720" decoding="async" fetchpriority="high" aria-hidden="true">
+        <div class="hero-band-shade" aria-hidden="true"></div>
         <div class="frame">
-          <section class="hero-split">
+          <section class="hero-split" aria-label="OpenGameNode free Minecraft hosting">
             <div class="hero-copy">
               ${heroCopy()}
               <div class="actions hero-actions">
@@ -476,9 +499,6 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
               </p>
             </div>
           </section>
-          <figure class="hero-photo">
-            <img src="/art/world-valley.jpg" alt="A block-built castle above a river valley at night" width="1280" height="720" decoding="async">
-          </figure>
         </div>
       </div>
       <div class="frame">
@@ -505,6 +525,7 @@ export function homePage(view: WishlistView, inviteUrl: string | null): string {
             <div>
               <h2 id="modpack-heading">${escapeHtml(content.home.modpackHeading)}</h2>
               <p>${escapeHtml(content.home.modpackBody)}</p>
+              ${platformStrip()}
               <p class="note">${escapeHtml(content.home.modpackSoon)}</p>
               <p class="actions"><a class="button button-secondary" href="/signup">${escapeHtml(content.home.primaryAction)}</a></p>
             </div>
@@ -662,6 +683,7 @@ export function minecraftPage(inviteUrl: string | null): string {
         <img src="/art/world-valley.jpg" alt="A block-built castle above a river valley at night" width="1280" height="720" decoding="async">
       </figure>
       ${serverTypeCards()}
+      ${platformStrip()}
 
       <section aria-labelledby="specs-heading">
         <h2 id="specs-heading">${escapeHtml(content.landing.specsHeading)}</h2>

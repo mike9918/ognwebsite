@@ -158,6 +158,9 @@ describe("pages", () => {
     expect(html).toContain("Open Game Node");
     expect(html).not.toContain("opengamnode");
     expect(html).toContain("/art/world-valley.jpg");
+    expect(html).toContain("hero-band--photo");
+    expect(html).toContain("/icons/curseforge.svg");
+    expect(html).toContain("CurseForge");
     expect(html).toContain("twice a day");
     expect(html).toContain('action="/api/auth/discord"');
     expect(html).toContain("Sign up free with Discord");
